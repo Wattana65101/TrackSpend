@@ -127,6 +127,14 @@ export default function RegisterScreen({ navigation }) {
         }),
       });
 
+      // ตรวจสอบ content-type ก่อน parse JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        Alert.alert("❌ ข้อผิดพลาด", "ได้รับ response ที่ไม่ถูกต้องจากเซิร์ฟเวอร์");
+        return;
+      }
+
       const data = await response.json();
 
       if (response.ok && data.success) {

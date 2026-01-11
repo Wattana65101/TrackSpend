@@ -6,18 +6,26 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 
 const app = express();
-const port = 3000;
-const SECRET_KEY = "your_very_secret_key";
+const port = process.env.SERVER_PORT || 3000;
+// ⚠️ หมายเหตุ: ควรใช้ environment variable สำหรับ production
+// ตัวอย่าง: process.env.JWT_SECRET_KEY || "your_very_secret_key"
+const SECRET_KEY = process.env.JWT_SECRET_KEY || "your_very_secret_key";
 
-app.use(cors());
+// CORS configuration - ควรกำหนด allowed origins ใน production
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : '*',
+  credentials: true
+}));
 app.use(bodyParser.json());
 
 // DB connection
+// ⚠️ หมายเหตุ: ควรใช้ environment variables สำหรับ production
+// ตัวอย่าง: process.env.DB_PASSWORD || "wattana15277"
 const db = mysql.createConnection({
-  host: "127.0.0.1",
-  user: "root",
-  password: "wattana15277",
-  database: "trackspend",
+  host: process.env.DB_HOST || "127.0.0.1",
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "wattana15277", // ⚠️ เปลี่ยนใน production
+  database: process.env.DB_NAME || "trackspend",
 });
 
 db.connect((err) => {
@@ -59,6 +67,25 @@ app.post("/api/register", (req, res) => {
     return res
       .status(400)
       .json({ success: false, message: "กรุณากรอกข้อมูลให้ครบถ้วน" });
+  }
+
+  // Input validation
+  if (username.length < 3 || username.length > 50) {
+    return res.status(400).json({ success: false, message: "ชื่อผู้ใช้ต้องมีความยาว 3-50 ตัวอักษร" });
+  }
+
+  const phoneDigits = phone.replace(/\D/g, "");
+  if (phoneDigits.length !== 10) {
+    return res.status(400).json({ success: false, message: "เบอร์โทรศัพท์ต้องเป็น 10 ตัวเลข" });
+  }
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ success: false, message: "รูปแบบอีเมลไม่ถูกต้อง" });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ success: false, message: "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร" });
   }
 
   const hashedPassword = bcrypt.hashSync(password, 8);
@@ -127,13 +154,29 @@ app.get("/api/transactions", verifyToken, (req, res) => {
 // ✅ Add transaction
 app.post("/api/transactions", verifyToken, (req, res) => {
   let { amount, type, category, note, date } = req.body;
-  if (!date) date = new Date();
+  
+  // Input validation
+  if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+    return res.status(400).json({ success: false, message: "จำนวนเงินไม่ถูกต้อง" });
+  }
+
+  if (!type || (type !== "income" && type !== "expense")) {
+    return res.status(400).json({ success: false, message: "ประเภทไม่ถูกต้อง" });
+  }
+
+  if (!category || category.trim() === "") {
+    return res.status(400).json({ success: false, message: "กรุณาเลือกหมวดหมู่" });
+  }
+
+  if (!date) date = new Date().toISOString().split("T")[0];
 
   const query =
     "INSERT INTO transactions (user_id, amount, type, category, note, date) VALUES (?, ?, ?, ?, ?, ?)";
-  db.query(query, [req.userId, amount, type, category, note, date], (err) => {
-    if (err)
+  db.query(query, [req.userId, parseFloat(amount), type, category.trim(), note || "", date], (err) => {
+    if (err) {
+      console.error("❌ Error adding transaction:", err);
       return res.status(500).json({ success: false, message: "Error adding transaction." });
+    }
     res.status(201).json({ success: true, message: "Transaction added successfully!" });
   });
 });
@@ -187,10 +230,22 @@ app.get("/api/budgets", verifyToken, (req, res) => {
 // ✅ Add budget
 app.post("/api/budgets", verifyToken, (req, res) => {
   const { category, limit } = req.body;
+
+  // Input validation
+  if (!category || category.trim() === "") {
+    return res.status(400).json({ success: false, message: "กรุณาเลือกหมวดหมู่" });
+  }
+
+  if (!limit || isNaN(parseFloat(limit)) || parseFloat(limit) <= 0) {
+    return res.status(400).json({ success: false, message: "จำนวนเงินไม่ถูกต้อง" });
+  }
+
   const query = "INSERT INTO budgets (user_id, category, `limit`) VALUES (?, ?, ?)";
-  db.query(query, [req.userId, category, limit], (err) => {
-    if (err)
+  db.query(query, [req.userId, category.trim(), parseFloat(limit)], (err) => {
+    if (err) {
+      console.error("❌ Error adding budget:", err);
       return res.status(500).json({ success: false, message: "Error adding budget." });
+    }
     res.status(201).json({ success: true, message: "Budget added successfully!" });
   });
 });

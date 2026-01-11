@@ -159,8 +159,15 @@ export default function AddTransactionScreen() {
         fetchTransactionsAndBudgets();
         navigation.goBack();
       } else {
-        const errorData = await response.json();
-        Alert.alert("❌ ข้อผิดพลาด", errorData.message || "ไม่สามารถบันทึกรายการได้");
+        // ตรวจสอบ content-type ก่อน parse JSON
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          Alert.alert("❌ ข้อผิดพลาด", errorData.message || "ไม่สามารถบันทึกรายการได้");
+        } else {
+          const errorText = await response.text();
+          Alert.alert("❌ ข้อผิดพลาด", `เกิดข้อผิดพลาด: ${response.status}`);
+        }
       }
     } catch (error) {
       console.error("Error saving transaction:", error);

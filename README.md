@@ -117,18 +117,66 @@ npm run ios
 - ใช้ JWT สำหรับการยืนยันตัวตน
 - Token หมดอายุใน 1 วัน
 
+## 📁 Project Structure
+
+```
+TrackSpend/
+├── components/          # Reusable components
+│   ├── AppLogo.js
+│   ├── MoneyGrowLogo.js
+│   ├── LoadingSpinner.js
+│   └── ErrorBoundary.js
+├── screens/            # Screen components
+│   ├── HomeScreen.js
+│   ├── LoginScreen.js
+│   ├── RegisterScreen.js
+│   ├── AddTransactionScreen.js
+│   └── ...
+├── assets/             # Images and assets
+├── server.js           # Backend server
+└── ...
+```
+
+## 🔒 Security
+
+- รหัสผ่านถูกเข้ารหัสด้วย bcrypt
+- ใช้ JWT สำหรับการยืนยันตัวตน
+- Token หมดอายุใน 1 วัน
+- **สำคัญ**: เปลี่ยน `SECRET_KEY` ใน production
+
+## 📝 Additional Files
+
+- `LICENSE` - MIT License
+- `CONTRIBUTING.md` - Guidelines สำหรับ contributors
+- `FEATURES.md` - Roadmap และ features ที่วางแผนไว้
+- `ENV_EXAMPLE.md` - ตัวอย่าง environment variables
+
+## 🧪 Testing
+
+```bash
+npm test
+```
+
 ## 📄 License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 👤 Author
 
 **Wattana65101**
 
+## 🤝 Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+
 ## 🙏 Acknowledgments
 
 - React Native Community
 - All contributors and open-source libraries used in this project
+
+## 📞 Support
+
+หากมีปัญหาหรือคำถาม สามารถเปิด issue บน GitHub ได้เลย
 
 ---
 
