@@ -1,97 +1,135 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# TrackSpend - Money Management App 💰
 
-# Getting Started
+แอปพลิเคชันจัดการเงินส่วนบุคคลที่ช่วยให้คุณติดตามรายรับ-รายจ่าย วางแผนงบประมาณ และวิเคราะห์การใช้เงินได้อย่างง่ายดาย
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## ✨ Features
 
-## Step 1: Start Metro
+- 📊 **ติดตามรายรับ-รายจ่าย** - บันทึกและจัดการธุรกรรมทางการเงินของคุณ
+- 💵 **ยอดเงินคงเหลือ** - ดูยอดเงินคงเหลือแบบเรียลไทม์
+- 📈 **กราฟสรุป** - วิเคราะห์รายรับ-รายจ่ายรายสัปดาห์และรายเดือน
+- 💰 **จัดการงบประมาณ** - ตั้งงบประมาณตามหมวดหมู่
+- 📱 **รายงาน** - ดูรายงานสรุปการใช้เงิน
+- 🎨 **ธีมสวยงาม** - รองรับหลายธีม (Emerald, Blue, Purple, Pink, Orange)
+- 🔐 **ระบบความปลอดภัย** - เข้ารหัสรหัสผ่านและใช้ JWT สำหรับการยืนยันตัวตน
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## 🛠️ Tech Stack
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+- **Frontend**: React Native
+- **Backend**: Node.js + Express
+- **Database**: MySQL
+- **Authentication**: JWT (JSON Web Token)
+- **Icons**: React Native Vector Icons
+- **Charts**: react-native-chart-kit
 
-```sh
-# Using npm
-npm start
+## 📋 Prerequisites
 
-# OR using Yarn
-yarn start
+- Node.js (v14 หรือสูงกว่า)
+- MySQL Server
+- React Native development environment
+- Android Studio (สำหรับ Android) หรือ Xcode (สำหรับ iOS)
+
+## 🚀 Installation
+
+1. **Clone repository**
+```bash
+git clone https://github.com/Wattana65101/TrackSpend.git
+cd TrackSpend
 ```
 
-## Step 2: Build and run your app
+2. **Install dependencies**
+```bash
+npm install
+```
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+3. **Setup Database**
+   - สร้าง database ชื่อ `trackspend`
+   - Import SQL files:
+     - `trackspend_users.sql`
+     - `trackspend_transactions.sql`
+     - `trackspend_budgets.sql`
+     - `trackspend_routines.sql`
+
+4. **Configure Server**
+   - แก้ไข `BASE_URL` ใน `screens/AppContext.js` ให้ตรงกับ IP address ของ server
+   - แก้ไข database connection ใน `server.js`
+
+5. **Start Server**
+```bash
+node server.js
+```
+
+6. **Run App**
 
 ### Android
-
-```sh
-# Using npm
+```bash
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
 ### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
+```bash
+cd ios
+pod install
+cd ..
 npm run ios
-
-# OR using Yarn
-yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+## 📱 Screenshots
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+- Home Screen - หน้าหลักแสดงยอดเงินคงเหลือและรายการล่าสุด
+- Add Transaction - เพิ่มรายรับ/รายจ่าย
+- Budgets - จัดการงบประมาณ
+- Reports - รายงานสรุป
+- Settings - ตั้งค่าและเปลี่ยนธีม
 
-## Step 3: Modify your app
+## 🔧 Configuration
 
-Now that you have successfully run the app, let's make changes!
+### Server Configuration
+แก้ไขไฟล์ `server.js`:
+- Database connection settings
+- JWT Secret Key
+- Port number
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+### App Configuration
+แก้ไขไฟล์ `screens/AppContext.js`:
+- `BASE_URL` - URL ของ backend server
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+## 📝 Features Detail
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+### การจัดการธุรกรรม
+- เพิ่มรายรับ/รายจ่าย
+- แก้ไขและลบธุรกรรม
+- จัดหมวดหมู่ธุรกรรม
+- เพิ่มหมายเหตุ
 
-## Congratulations! :tada:
+### การจัดการงบประมาณ
+- ตั้งงบประมาณตามหมวดหมู่
+- ติดตามการใช้เงินเทียบกับงบประมาณ
+- แก้ไขและลบงบประมาณ
 
-You've successfully run and modified your React Native App. :partying_face:
+### การวิเคราะห์
+- กราฟรายรับ-รายจ่ายรายสัปดาห์
+- กราฟรายรับ-รายจ่ายรายเดือน
+- สรุปรายรับ-รายจ่ายเดือนนี้
 
-### Now what?
+## 🔐 Security
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+- รหัสผ่านถูกเข้ารหัสด้วย bcrypt
+- ใช้ JWT สำหรับการยืนยันตัวตน
+- Token หมดอายุใน 1 วัน
 
-# Troubleshooting
+## 📄 License
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+This project is licensed under the MIT License.
 
-# Learn More
+## 👤 Author
 
-To learn more about React Native, take a look at the following resources:
+**Wattana65101**
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+## 🙏 Acknowledgments
+
+- React Native Community
+- All contributors and open-source libraries used in this project
+
+---
+
+Made with ❤️ using React Native
