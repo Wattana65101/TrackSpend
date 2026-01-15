@@ -1,0 +1,34 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: trackspend-mysql
+    restart: unless-stopped
+    ports:
+      - "3308:3306"  # Map host port 3308 to container port 3306
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-wattana15277}
+      MYSQL_DATABASE: ${DB_NAME:-trackspend}
+      MYSQL_USER: ${DB_USER:-trackspend_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-trackspend_pass}
+      TZ: Asia/Bangkok
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init:/docker-entrypoint-initdb.d  # SQL scripts to run on first start
+      - ./database/data:/var/lib/mysql-files  # Optional: for data exports
+    networks:
+      - trackspend-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD:-wattana15277}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  trackspend-network:
+    driver: bridge
+

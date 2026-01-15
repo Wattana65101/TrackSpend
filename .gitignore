@@ -89,3 +89,8 @@ yarn-error.log*
 # Server files (if running locally)
 server.js
 trackspend_*.sql
+
+# Docker
+docker-compose.override.yml
+.env
+*.env.local

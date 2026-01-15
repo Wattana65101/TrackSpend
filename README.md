@@ -42,16 +42,27 @@ npm install
 ```
 
 3. **Setup Database**
+
+   **วิธีที่ 1: ใช้ Docker (แนะนำ)**
+   ```bash
+   # เริ่ม MySQL container (port 3308)
+   .\docker-start.ps1
+   
+   # หรือใช้ docker-compose โดยตรง
+   docker-compose up -d
+   ```
+   ดูรายละเอียดเพิ่มเติมใน `database/DOCKER_SETUP.md`
+
+   **วิธีที่ 2: ติดตั้ง MySQL แบบปกติ**
+   - ติดตั้ง MySQL Server
    - สร้าง database ชื่อ `trackspend`
-   - Import SQL files:
-     - `trackspend_users.sql`
-     - `trackspend_transactions.sql`
-     - `trackspend_budgets.sql`
-     - `trackspend_routines.sql`
+   - Import schema: `mysql -u root -p trackspend < database/schema.sql`
 
 4. **Configure Server**
+   - สร้างไฟล์ `.env` จาก `docker.env.example` (ถ้าใช้ Docker)
    - แก้ไข `BASE_URL` ใน `screens/AppContext.js` ให้ตรงกับ IP address ของ server
-   - แก้ไข database connection ใน `server.js`
+   - สำหรับ Docker: ตั้งค่า `DB_HOST=localhost` และ `DB_PORT=3308` ใน `.env`
+   - สำหรับ MySQL แบบปกติ: ตั้งค่า `DB_HOST=127.0.0.1` และ `DB_PORT=3306`
 
 5. **Start Server**
 ```bash

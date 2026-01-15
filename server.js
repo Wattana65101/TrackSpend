@@ -20,9 +20,11 @@ app.use(bodyParser.json());
 
 // DB connection
 // ⚠️ หมายเหตุ: ควรใช้ environment variables สำหรับ production
-// ตัวอย่าง: process.env.DB_PASSWORD || "wattana15277"
+// สำหรับ Docker: DB_HOST=localhost, DB_PORT=3308
+// สำหรับ MySQL แบบปกติ: DB_HOST=127.0.0.1, DB_PORT=3306
 const db = mysql.createConnection({
   host: process.env.DB_HOST || "127.0.0.1",
+  port: process.env.DB_PORT || 3306, // Docker ใช้ 3308, MySQL ปกติใช้ 3306
   user: process.env.DB_USER || "root",
   password: process.env.DB_PASSWORD || "wattana15277", // ⚠️ เปลี่ยนใน production
   database: process.env.DB_NAME || "trackspend",
