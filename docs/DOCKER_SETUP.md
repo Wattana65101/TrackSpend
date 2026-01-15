@@ -11,24 +11,27 @@
 
 ### 1. สร้างไฟล์ `.env` (ถ้ายังไม่มี)
 
-```bash
-# คัดลอกจาก docker.env.example
-cp docker.env.example .env
+```powershell
+# Windows PowerShell - คัดลอกจาก docker.env.example
+Copy-Item docker\docker.env.example .env
 ```
 
 แก้ไขค่าตามต้องการ (หรือใช้ค่า default ก็ได้)
 
 ### 2. เริ่ม Docker Container
 
-```bash
-# Start MySQL container
-docker-compose up -d
+```powershell
+# วิธีที่ 1: ใช้สคริปต์ (แนะนำ)
+.\scripts\docker-start.ps1
+
+# วิธีที่ 2: ใช้ docker-compose โดยตรง
+docker-compose -f docker\docker-compose.yml up -d
 
 # ตรวจสอบสถานะ
-docker-compose ps
+docker-compose -f docker\docker-compose.yml ps
 
 # ดู logs
-docker-compose logs -f mysql
+docker-compose -f docker\docker-compose.yml logs -f mysql
 ```
 
 ### 3. ตรวจสอบการเชื่อมต่อ
@@ -176,9 +179,9 @@ docker-compose up -d
 
 ### Container ไม่ start
 
-```bash
+```powershell
 # ดู logs เพื่อหาสาเหตุ
-docker-compose logs mysql
+docker-compose -f docker\docker-compose.yml logs mysql
 
 # ตรวจสอบว่า port 3308 ว่างหรือไม่
 netstat -ano | findstr :3308
@@ -187,13 +190,13 @@ netstat -ano | findstr :3308
 ### ไม่สามารถเชื่อมต่อได้
 
 1. ตรวจสอบว่า container ทำงานอยู่:
-   ```bash
-   docker-compose ps
+   ```powershell
+   docker-compose -f docker\docker-compose.yml ps
    ```
 
 2. ตรวจสอบ logs:
-   ```bash
-   docker-compose logs mysql
+   ```powershell
+   docker-compose -f docker\docker-compose.yml logs mysql
    ```
 
 3. ทดสอบเชื่อมต่อจากภายใน container:
@@ -206,8 +209,8 @@ netstat -ano | findstr :3308
 ข้อมูลถูกเก็บใน Docker volume `mysql_data` ซึ่งจะไม่หายเมื่อ restart container
 
 ถ้าต้องการลบข้อมูล:
-```bash
-docker-compose down -v  # ⚠️ ระวัง! จะลบข้อมูลทั้งหมด
+```powershell
+docker-compose -f docker\docker-compose.yml down -v  # ⚠️ ระวัง! จะลบข้อมูลทั้งหมด
 ```
 
 ## 📝 หมายเหตุ

@@ -8,20 +8,20 @@
 
 ```powershell
 # Windows PowerShell
-.\docker-start.ps1
+.\scripts\docker-start.ps1
 
 # หรือใช้ docker-compose โดยตรง
-docker-compose up -d
+docker-compose -f docker\docker-compose.yml up -d
 ```
 
 ### 2. ตรวจสอบสถานะ
 
 ```powershell
 # ดูสถานะ container
-docker-compose ps
+docker-compose -f docker\docker-compose.yml ps
 
 # ดู logs
-docker-compose logs -f mysql
+docker-compose -f docker\docker-compose.yml logs -f mysql
 ```
 
 ### 3. เชื่อมต่อ Database
@@ -41,7 +41,7 @@ mysql -h 127.0.0.1 -P 3308 -u trackspend_user -ptrackspend_pass trackspend
 
 ### 4. ตั้งค่า Server
 
-สร้างไฟล์ `.env`:
+สร้างไฟล์ `.env` จาก `docker\docker.env.example`:
 ```env
 DB_HOST=localhost
 DB_PORT=3308
@@ -59,17 +59,17 @@ node server.js
 ## 🛑 หยุด Container
 
 ```powershell
-.\docker-stop.ps1
+.\scripts\docker-stop.ps1
 
 # หรือ
-docker-compose stop
+docker-compose -f docker\docker-compose.yml stop
 ```
 
 ## 📊 คำสั่งที่มีประโยชน์
 
 ```bash
 # ดู logs
-docker-compose logs -f mysql
+docker-compose -f docker\docker-compose.yml logs -f mysql
 
 # เข้าไปใน container
 docker exec -it trackspend-mysql bash
@@ -80,8 +80,8 @@ docker exec -it trackspend-mysql mysql -u root -p
 # Backup database
 docker exec trackspend-mysql mysqldump -u root -pwattana15277 trackspend > backup.sql
 
-# Restore database
-docker exec -i trackspend-mysql mysql -u root -pwattana15277 trackspend < backup.sql
+# Restore database (PowerShell)
+Get-Content backup.sql | docker exec -i trackspend-mysql mysql -u root -pwattana15277 trackspend
 ```
 
 ## ⚠️ หมายเหตุ

@@ -1,6 +1,11 @@
 # PowerShell script สำหรับเริ่ม Docker MySQL container
 # TrackSpend Database Setup
 
+# เปลี่ยนไปยัง root directory ของโปรเจกต์
+$scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = Split-Path -Parent $scriptPath
+Push-Location $projectRoot
+
 Write-Host "🐳 Starting TrackSpend MySQL Docker Container..." -ForegroundColor Cyan
 
 # ตรวจสอบว่า Docker ทำงานอยู่หรือไม่
@@ -10,12 +15,14 @@ try {
 } catch {
     Write-Host "❌ Docker is not installed or not running" -ForegroundColor Red
     Write-Host "   Please install Docker Desktop from https://www.docker.com/products/docker-desktop" -ForegroundColor Yellow
+    Pop-Location
     exit 1
 }
 
 # ตรวจสอบว่า docker-compose.yml มีอยู่หรือไม่
-if (-not (Test-Path "docker-compose.yml")) {
-    Write-Host "❌ docker-compose.yml not found!" -ForegroundColor Red
+if (-not (Test-Path "docker\docker-compose.yml")) {
+    Write-Host "❌ docker\docker-compose.yml not found!" -ForegroundColor Red
+    Pop-Location
     exit 1
 }
 
@@ -28,7 +35,7 @@ if ($portCheck) {
 
 # Start Docker container
 Write-Host "`n🚀 Starting MySQL container..." -ForegroundColor Cyan
-docker-compose up -d
+docker-compose -f docker\docker-compose.yml up -d
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "✅ Container started successfully!" -ForegroundColor Green
@@ -55,7 +62,7 @@ if ($LASTEXITCODE -eq 0) {
     }
     
     if (-not $ready) {
-        Write-Host "`n⚠️  MySQL might still be starting. Check logs with: docker-compose logs mysql" -ForegroundColor Yellow
+        Write-Host "`n⚠️  MySQL might still be starting. Check logs with: docker-compose -f docker\docker-compose.yml logs mysql" -ForegroundColor Yellow
     }
     
     # แสดงข้อมูลการเชื่อมต่อ
@@ -77,7 +84,7 @@ if ($LASTEXITCODE -eq 0) {
         Write-Host "⚠️  Database schema not found. Importing..." -ForegroundColor Yellow
         
         if (Test-Path "database\schema.sql") {
-            docker exec -i trackspend-mysql mysql -u root -pwattana15277 < database\schema.sql
+            Get-Content database\schema.sql | docker exec -i trackspend-mysql mysql -u root -pwattana15277
             if ($LASTEXITCODE -eq 0) {
                 Write-Host "✅ Schema imported successfully!" -ForegroundColor Green
             } else {
@@ -89,13 +96,15 @@ if ($LASTEXITCODE -eq 0) {
     }
     
     Write-Host "`n✨ Setup complete!" -ForegroundColor Green
-    Write-Host "   View logs: docker-compose logs -f mysql" -ForegroundColor Cyan
-    Write-Host "   Stop container: docker-compose stop" -ForegroundColor Cyan
+    Write-Host "   View logs: docker-compose -f docker\docker-compose.yml logs -f mysql" -ForegroundColor Cyan
+    Write-Host "   Stop container: .\scripts\docker-stop.ps1" -ForegroundColor Cyan
     Write-Host "   Connect: mysql -h 127.0.0.1 -P 3308 -u trackspend_user -ptrackspend_pass trackspend" -ForegroundColor Cyan
     
 } else {
     Write-Host "❌ Failed to start container" -ForegroundColor Red
-    Write-Host "   Check logs: docker-compose logs mysql" -ForegroundColor Yellow
+    Write-Host "   Check logs: docker-compose -f docker\docker-compose.yml logs mysql" -ForegroundColor Yellow
+    Pop-Location
     exit 1
 }
 
+Pop-Location

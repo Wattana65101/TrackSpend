@@ -46,12 +46,12 @@ npm install
    **วิธีที่ 1: ใช้ Docker (แนะนำ)**
    ```bash
    # เริ่ม MySQL container (port 3308)
-   .\docker-start.ps1
+   .\scripts\docker-start.ps1
    
    # หรือใช้ docker-compose โดยตรง
-   docker-compose up -d
+   docker-compose -f docker\docker-compose.yml up -d
    ```
-   ดูรายละเอียดเพิ่มเติมใน `database/DOCKER_SETUP.md`
+   ดูรายละเอียดเพิ่มเติมใน `docs/DOCKER_SETUP.md` หรือ `docs/DOCKER_QUICKSTART.md`
 
    **วิธีที่ 2: ติดตั้ง MySQL แบบปกติ**
    - ติดตั้ง MySQL Server
@@ -59,10 +59,11 @@ npm install
    - Import schema: `mysql -u root -p trackspend < database/schema.sql`
 
 4. **Configure Server**
-   - สร้างไฟล์ `.env` จาก `docker.env.example` (ถ้าใช้ Docker)
+   - สร้างไฟล์ `.env` จาก `docker\docker.env.example` (ถ้าใช้ Docker)
    - แก้ไข `BASE_URL` ใน `screens/AppContext.js` ให้ตรงกับ IP address ของ server
    - สำหรับ Docker: ตั้งค่า `DB_HOST=localhost` และ `DB_PORT=3308` ใน `.env`
    - สำหรับ MySQL แบบปกติ: ตั้งค่า `DB_HOST=127.0.0.1` และ `DB_PORT=3306`
+   - ดูตัวอย่างเพิ่มเติมใน `docs/ENV_EXAMPLE.md`
 
 5. **Start Server**
 ```bash
