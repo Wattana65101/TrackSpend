@@ -4,8 +4,8 @@
 
 ```env
 # Server Configuration
-BASE_URL=http://10.0.2.2:3000
-SERVER_PORT=3000
+BASE_URL=http://10.0.2.2:500
+SERVER_PORT=500
 
 # Database Configuration
 DB_HOST=localhost

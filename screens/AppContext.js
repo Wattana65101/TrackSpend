@@ -2,7 +2,7 @@ import React, { createContext, useState, useMemo, useEffect } from "react";
 import { useColorScheme, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const BASE_URL = "http://10.0.2.2:3000"; 
+export const BASE_URL = "http://10.0.2.2:500"; 
 
 //  THEME & COLORS
 const hexToRgbA = (hex, alpha) => {

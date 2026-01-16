@@ -6,7 +6,7 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 
 const app = express();
-const port = process.env.SERVER_PORT || 3000;
+const port = process.env.SERVER_PORT || 500;
 // ⚠️ หมายเหตุ: ควรใช้ environment variable สำหรับ production
 // ตัวอย่าง: process.env.JWT_SECRET_KEY || "your_very_secret_key"
 const SECRET_KEY = process.env.JWT_SECRET_KEY || "your_very_secret_key";
@@ -23,10 +23,10 @@ app.use(bodyParser.json());
 // สำหรับ Docker: DB_HOST=localhost, DB_PORT=3308
 // สำหรับ MySQL แบบปกติ: DB_HOST=127.0.0.1, DB_PORT=3306
 const db = mysql.createConnection({
-  host: process.env.DB_HOST || "127.0.0.1",
-  port: process.env.DB_PORT || 3306, // Docker ใช้ 3308, MySQL ปกติใช้ 3306
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "wattana15277", // ⚠️ เปลี่ยนใน production
+  host: process.env.DB_HOST || "localhost",
+  port: process.env.DB_PORT || 3308, // Docker ใช้ 3308, MySQL ปกติใช้ 3306
+  user: process.env.DB_USER || "trackspend_user",
+  password: process.env.DB_PASSWORD || "trackspend_pass", // ⚠️ เปลี่ยนใน production
   database: process.env.DB_NAME || "trackspend",
 });
 
@@ -63,6 +63,21 @@ const verifyToken = (req, res, next) => {
 
 // ✅ Register
 app.post("/api/register", (req, res) => {
+  console.log("📥 Received register request:", { 
+    username: req.body.username, 
+    email: req.body.email, 
+    phone: req.body.phone 
+  });
+  
+  // ตรวจสอบว่า database connected หรือไม่
+  if (db.state === "disconnected") {
+    console.error("❌ Database is disconnected!");
+    return res.status(503).json({ 
+      success: false, 
+      message: "ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้ กรุณาตรวจสอบการตั้งค่า MySQL" 
+    });
+  }
+
   const { username, phone, email, password } = req.body;
 
   if (!username || !phone || !email || !password) {
@@ -94,8 +109,9 @@ app.post("/api/register", (req, res) => {
   const query =
     "INSERT INTO users (username, phone, email, password) VALUES (?, ?, ?, ?)";
 
-  db.query(query, [username, phone, email, hashedPassword], (err) => {
+  db.query(query, [username, phoneDigits, email, hashedPassword], (err) => {
     if (err) {
+      console.error("❌ Database error:", err);
       if (err.code === "ER_DUP_ENTRY") {
         return res
           .status(409)
@@ -103,8 +119,9 @@ app.post("/api/register", (req, res) => {
       }
       return res
         .status(500)
-        .json({ success: false, message: "เกิดข้อผิดพลาดในการสมัครสมาชิก" });
+        .json({ success: false, message: `เกิดข้อผิดพลาดในการสมัครสมาชิก: ${err.message}` });
     }
+    console.log("✅ User registered successfully:", email);
     res.status(201).json({ success: true, message: "สมัครสมาชิกสำเร็จ!" });
   });
 });

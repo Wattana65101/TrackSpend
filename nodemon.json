@@ -1,0 +1,21 @@
+{
+  "watch": [
+    "server.js"
+  ],
+  "ext": "js,json",
+  "ignore": [
+    "node_modules/**/*",
+    "android/**/*",
+    "ios/**/*",
+    "screens/**/*",
+    "components/**/*",
+    "*.test.js",
+    "*.spec.js"
+  ],
+  "exec": "node server.js",
+  "env": {
+    "NODE_ENV": "development"
+  },
+  "delay": 1000
+}
+

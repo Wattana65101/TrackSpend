@@ -116,26 +116,48 @@ export default function RegisterScreen({ navigation }) {
     try {
       // ใช้ phoneDigits ที่ลบตัวอักษรที่ไม่ใช่ตัวเลขแล้ว
       const phoneDigits = phone.replace(/\D/g, "");
+      const requestData = {
+        username,
+        phone: phoneDigits, // ส่งเฉพาะตัวเลข
+        email,
+        password,
+      };
+      
+      console.log("📤 Sending register request to:", `${BASE_URL}/api/register`);
+      console.log("📤 Request data:", { ...requestData, password: "***" }); // ไม่ log password แบบเต็ม
+      
       const response = await fetch(`${BASE_URL}/api/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          phone: phoneDigits, // ส่งเฉพาะตัวเลข
-          email,
-          password,
-        }),
+        body: JSON.stringify(requestData),
       });
+
+      console.log("📥 Response status:", response.status);
+      console.log("📥 Response headers:", response.headers);
 
       // ตรวจสอบ content-type ก่อน parse JSON
       const contentType = response.headers.get("content-type");
+      let data;
+      
       if (!contentType || !contentType.includes("application/json")) {
         const text = await response.text();
-        Alert.alert("❌ ข้อผิดพลาด", "ได้รับ response ที่ไม่ถูกต้องจากเซิร์ฟเวอร์");
+        console.error("❌ Response is not JSON:", text);
+        Alert.alert("❌ ข้อผิดพลาด", `เซิร์ฟเวอร์ส่ง response กลับมาไม่ถูกต้อง\nStatus: ${response.status}\nResponse: ${text.substring(0, 100)}`);
         return;
       }
 
-      const data = await response.json();
+      const text = await response.text();
+      console.log("📥 Response text:", text);
+      
+      try {
+        data = JSON.parse(text);
+      } catch (parseError) {
+        console.error("❌ JSON parse error:", parseError, "Response text:", text);
+        Alert.alert("❌ ข้อผิดพลาด", "ไม่สามารถแปลงข้อมูลจากเซิร์ฟเวอร์ได้");
+        return;
+      }
+
+      console.log("📥 Response data:", data);
 
       if (response.ok && data.success) {
         Alert.alert("✅ สำเร็จ", data.message || "สมัครสมาชิกเรียบร้อยแล้ว!", [
@@ -148,8 +170,21 @@ export default function RegisterScreen({ navigation }) {
         Alert.alert("❌ ล้มเหลว", data.message || "สมัครไม่สำเร็จ");
       }
     } catch (error) {
-      console.error("Register error:", error);
-      Alert.alert("Error", "เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์");
+      console.error("🔥 Register error:", error);
+      console.error("🔥 Error message:", error.message);
+      console.error("🔥 Error stack:", error.stack);
+      
+      // ตรวจสอบประเภท error
+      if (error.message && error.message.includes("Network request failed")) {
+        Alert.alert(
+          "❌ เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", 
+          "กรุณาตรวจสอบ:\n1. เซิร์ฟเวอร์รันอยู่หรือไม่ (npm run server)\n2. MySQL container รันอยู่หรือไม่\n3. พอร์ตและ URL ถูกต้องหรือไม่"
+        );
+      } else if (error.message && error.message.includes("timeout")) {
+        Alert.alert("❌ หมดเวลา", "การเชื่อมต่อหมดเวลา กรุณาลองใหม่อีกครั้ง");
+      } else {
+        Alert.alert("❌ ข้อผิดพลาด", `เกิดข้อผิดพลาด: ${error.message || "ไม่ทราบสาเหตุ"}`);
+      }
     } finally {
       setLoading(false);
     }
