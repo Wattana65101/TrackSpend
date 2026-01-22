@@ -80,6 +80,8 @@ export default function HomeScreen() {
     const incomeTotals = new Array(12).fill(0);
     const expenseTotals = new Array(12).fill(0);
 
+    // เก็บข้อมูลตามเดือนในปี (0 = ม.ค., 1 = ก.พ., ..., 11 = ธ.ค.)
+    // รวมข้อมูลของ 12 เดือนล่าสุด แต่จัดกลุ่มตามเดือนในปี
     transactions.forEach((t) => {
       if (t.date) {
         const tDate = new Date(t.date);
@@ -91,25 +93,22 @@ export default function HomeScreen() {
         
         // ใช้ข้อมูล 12 เดือนล่าสุดเท่านั้น
         if (monthsAgo >= 0 && monthsAgo < 12) {
-          const index = 11 - monthsAgo; // 0 = เดือนล่าสุด, 11 = เดือนเก่าสุด
+          // เก็บข้อมูลตามเดือนในปี (0 = ม.ค., 1 = ก.พ., ..., 11 = ธ.ค.)
+          const monthIndex = tMonth; // 0-11 ตามเดือนในปี
           const amt = parseFloat(t.amount);
           if (!isNaN(amt)) {
             if (t.type === "income") {
-              incomeTotals[index] += amt;
+              incomeTotals[monthIndex] += amt;
             } else if (t.type === "expense") {
-              expenseTotals[index] += amt;
+              expenseTotals[monthIndex] += amt;
             }
           }
         }
       }
     });
 
-    // สร้าง labels สำหรับ 12 เดือนล่าสุด (จากเก่าสุดไปใหม่สุด)
-    const labels = [];
-    for (let i = 11; i >= 0; i--) {
-      const monthIndex = (nowMonth - i + 12) % 12;
-      labels.push(months[monthIndex]);
-    }
+    // สร้าง labels เรียงตามลำดับเดือนในปี (ม.ค. ถึง ธ.ค.)
+    const labels = months; // ["ม.ค.", "ก.พ.", "มี.ค.", ..., "ธ.ค."]
 
     return {
       labels: labels,
@@ -396,50 +395,57 @@ export default function HomeScreen() {
               </View>
             </View>
             
-            {/* แสดง BarChart เสมอ */}
-            <BarChart
-              data={{
-                labels: chartData.labels,
-                datasets: [
-                  {
-                    data: chartData.datasets[0]?.data || [],
+            {/* แสดง BarChart พร้อม horizontal scroll */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={true}
+              contentContainerStyle={{ paddingRight: 20 }}
+              style={{ marginTop: 10 }}
+            >
+              <BarChart
+                data={{
+                  labels: chartData.labels,
+                  datasets: [
+                    {
+                      data: chartData.datasets[0]?.data || [],
+                    },
+                  ],
+                }}
+                width={Math.max(screenWidth - 80, chartData.labels.length * 70)}
+                height={200}
+                chartConfig={{
+                  backgroundColor: colors?.card,
+                  backgroundGradientFrom: colors?.card,
+                  backgroundGradientTo: colors?.card,
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => colors?.income || "#10B981",
+                  labelColor: (opacity = 1) => colors?.subtext,
+                  propsForBackgroundLines: {
+                    strokeDasharray: "",
+                    stroke: hexToRgbA(colors?.subtext, 0.15),
+                    strokeWidth: 1,
                   },
-                ],
-              }}
-              width={screenWidth - 80}
-              height={200}
-              chartConfig={{
-                backgroundColor: colors?.card,
-                backgroundGradientFrom: colors?.card,
-                backgroundGradientTo: colors?.card,
-                decimalPlaces: 0,
-                color: (opacity = 1) => colors?.income || "#10B981",
-                labelColor: (opacity = 1) => colors?.subtext,
-                propsForBackgroundLines: {
-                  strokeDasharray: "",
-                  stroke: hexToRgbA(colors?.subtext, 0.15),
-                  strokeWidth: 1,
-                },
-                propsForVerticalLabels: {
-                  fontSize: 11,
-                },
-                propsForHorizontalLabels: {
-                  fontSize: 11,
-                },
-              }}
-              style={{ borderRadius: 16, marginTop: 10 }}
-              withInnerLines={true}
-              withOuterLines={false}
-              withVerticalLabels={true}
-              withHorizontalLabels={true}
-              segments={4}
-              formatYLabel={(value) => {
-                const num = parseFloat(value);
-                if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
-                return num.toString();
-              }}
-              showValuesOnTopOfBars={false}
-            />
+                  propsForVerticalLabels: {
+                    fontSize: 11,
+                  },
+                  propsForHorizontalLabels: {
+                    fontSize: 11,
+                  },
+                }}
+                style={{ borderRadius: 16 }}
+                withInnerLines={true}
+                withOuterLines={false}
+                withVerticalLabels={true}
+                withHorizontalLabels={true}
+                segments={4}
+                formatYLabel={(value) => {
+                  const num = parseFloat(value);
+                  if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
+                  return num.toString();
+                }}
+                showValuesOnTopOfBars={false}
+              />
+            </ScrollView>
           </>
         )}
         {chartData.labels.length === 0 && (

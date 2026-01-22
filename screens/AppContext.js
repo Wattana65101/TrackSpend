@@ -1,4 +1,4 @@
-import React, { createContext, useState, useMemo, useEffect } from "react";
+import React, { createContext, useState, useMemo, useEffect, useCallback } from "react";
 import { useColorScheme, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -213,14 +213,26 @@ export function AppProvider({ children }) {
   const systemTheme = useColorScheme();
   const [token, setToken] = useState(null);
   const [username, setUsername] = useState(null);
-  const [transactions, setTransactions] = useState([]);
+  const [transactions, setTransactions] = useState(null); // null = ยังไม่ได้ fetch, [] = fetch แล้วแต่ไม่มีข้อมูล
   const [budgets, setBudgets] = useState([]);
   const [totalBalance, setTotalBalance] = useState(0);
   const [theme, setTheme] = useState("emerald"); // ✅ default emerald theme (MoneyGrow)
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(null); // null = กำลังโหลด, true/false = โหลดเสร็จ
+  const [isNewUser, setIsNewUser] = useState(false); // เช็คว่าเป็นบัญชีใหม่หรือไม่
   const colors = themes[theme] || themes.emerald;
 
+  // Helper function สำหรับล้าง token เมื่อหมดอายุ
+  const clearTokenAndLogout = useCallback(async () => {
+    console.warn("⚠️ Token expired or invalid, clearing token and logging out");
+    await AsyncStorage.removeItem("token");
+    setToken(null);
+    setTransactions(null);
+    setBudgets([]);
+    setUsername(null);
+  }, [setToken]);
+
   // โหลด transactions และ budgets
-  const fetchTransactionsAndBudgets = async () => {
+  const fetchTransactionsAndBudgets = useCallback(async () => {
     if (!token) {
       console.warn("⚠️ No token found, skipping fetchTransactionsAndBudgets");
       return;
@@ -234,7 +246,24 @@ export function AppProvider({ children }) {
       if (transactionsResponse.ok) {
         const transactionsData = JSON.parse(transactionsText);
         setTransactions(transactionsData);
+        
+        // เช็คว่าเป็นบัญชีใหม่หรือไม่ (ไม่มี transactions = บัญชีใหม่)
+        const isNew = transactionsData.length === 0;
+        console.log("🔍 Checking if new user:", { transactionsCount: transactionsData.length, isNew });
+        setIsNewUser(isNew);
+        
+        // ถ้าเป็นบัญชีใหม่ ให้ลบ hasSeenOnboarding เพื่อให้แสดง onboarding
+        if (isNew) {
+          await AsyncStorage.removeItem("hasSeenOnboarding");
+          setHasSeenOnboarding(false);
+          console.log("✅ New user detected, clearing onboarding status");
+        }
       } else {
+        // ถ้าเป็น 401 หรือ 403 แสดงว่า token หมดอายุหรือไม่ถูกต้อง
+        if (transactionsResponse.status === 401 || transactionsResponse.status === 403) {
+          await clearTokenAndLogout();
+          return;
+        }
         console.error("❌ Failed to fetch transactions:", transactionsResponse.status, transactionsText);
       }
 
@@ -247,12 +276,17 @@ export function AppProvider({ children }) {
         const budgetsData = JSON.parse(budgetsText);
         setBudgets(budgetsData);
       } else {
+        // ถ้าเป็น 401 หรือ 403 แสดงว่า token หมดอายุหรือไม่ถูกต้อง
+        if (budgetsResponse.status === 401 || budgetsResponse.status === 403) {
+          await clearTokenAndLogout();
+          return;
+        }
         console.error("❌ Failed to fetch budgets:", budgetsResponse.status, budgetsText);
       }
     } catch (error) {
       console.error("🔥 Error fetching data:", error);
     }
-  };
+  }, [token, clearTokenAndLogout, setHasSeenOnboarding, setIsNewUser]);
 
   // ลบ transaction
   const deleteTransaction = async (id) => {
@@ -265,6 +299,12 @@ export function AppProvider({ children }) {
         Alert.alert("สำเร็จ", "ลบรายการเรียบร้อยแล้ว");
         fetchTransactionsAndBudgets();
       } else {
+        // ถ้าเป็น 401 หรือ 403 แสดงว่า token หมดอายุหรือไม่ถูกต้อง
+        if (response.status === 401 || response.status === 403) {
+          await clearTokenAndLogout();
+          Alert.alert("เซสชันหมดอายุ", "กรุณาเข้าสู่ระบบอีกครั้ง");
+          return;
+        }
         const errorText = await response.text();
         console.error("❌ Delete failed:", response.status, errorText);
         Alert.alert("ข้อผิดพลาด", "ไม่สามารถลบรายการได้");
@@ -286,6 +326,12 @@ export function AppProvider({ children }) {
         Alert.alert("สำเร็จ", "ลบงบประมาณเรียบร้อยแล้ว");
         fetchTransactionsAndBudgets();
       } else {
+        // ถ้าเป็น 401 หรือ 403 แสดงว่า token หมดอายุหรือไม่ถูกต้อง
+        if (response.status === 401 || response.status === 403) {
+          await clearTokenAndLogout();
+          Alert.alert("เซสชันหมดอายุ", "กรุณาเข้าสู่ระบบอีกครั้ง");
+          return;
+        }
         const errorText = await response.text();
         console.error("❌ Delete budget failed:", response.status, errorText);
         Alert.alert("ข้อผิดพลาด", "ไม่สามารถลบงบประมาณได้");
@@ -298,7 +344,7 @@ export function AppProvider({ children }) {
 
   // คำนวณยอดเงินรวม
   useEffect(() => {
-    if (transactions.length > 0) {
+    if (transactions && transactions.length > 0) {
       const balance = transactions.reduce((sum, t) => {
         const amt = Number(t.amount) || 0;
         return sum + (t.type === "income" ? amt : -amt);
@@ -309,7 +355,7 @@ export function AppProvider({ children }) {
     }
   }, [transactions]);
 
-  // โหลด token, username, theme จาก AsyncStorage
+  // โหลด token, username, theme, hasSeenOnboarding จาก AsyncStorage
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -327,8 +373,15 @@ export function AppProvider({ children }) {
           setTheme("emerald");
           await AsyncStorage.setItem("theme", "emerald");
         }
+
+        // โหลด onboarding status
+        const hasSeen = await AsyncStorage.getItem("hasSeenOnboarding");
+        const hasSeenValue = hasSeen === "true";
+        console.log("🔍 Loading onboarding status:", { hasSeen, hasSeenValue });
+        setHasSeenOnboarding(hasSeenValue);
       } catch (error) {
         console.error("Failed to load data", error);
+        setHasSeenOnboarding(false); // ถ้า error ให้แสดง onboarding
       }
     };
     loadData();
@@ -344,7 +397,7 @@ export function AppProvider({ children }) {
   }, [theme]);
 
   // ดึงข้อมูล user profile
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     if (!token) {
       console.warn("⚠️ No token found, skipping fetchUserProfile");
       return;
@@ -358,7 +411,7 @@ export function AppProvider({ children }) {
       if (!response.ok) {
         // ถ้าเป็น 401 หรือ 403 อาจเป็น token หมดอายุ
         if (response.status === 401 || response.status === 403) {
-          console.warn("⚠️ Token expired or invalid, skipping user profile fetch");
+          await clearTokenAndLogout();
           return;
         }
       }
@@ -406,7 +459,7 @@ export function AppProvider({ children }) {
         console.error("🔥 Error fetching user profile:", error.message);
       }
     }
-  };
+  }, [token, clearTokenAndLogout, setUsername]);
 
   // โหลดข้อมูลเมื่อ token เปลี่ยน
   useEffect(() => {
@@ -414,11 +467,12 @@ export function AppProvider({ children }) {
       fetchTransactionsAndBudgets();
       fetchUserProfile(); // ดึงข้อมูล user profile
     } else {
-      setTransactions([]);
+      setTransactions(null); // reset เป็น null เมื่อ logout
       setBudgets([]);
       setUsername(null); // ล้าง username เมื่อ logout
+      setIsNewUser(false); // รีเซ็ต isNewUser เมื่อ logout
     }
-  }, [token]);
+  }, [token, fetchTransactionsAndBudgets, fetchUserProfile]);
 
   const value = useMemo(
     () => ({
@@ -439,8 +493,12 @@ export function AppProvider({ children }) {
       hexToRgbA,
       expenseCategories,
       incomeCategories,
+      hasSeenOnboarding,
+      setHasSeenOnboarding,
+      isNewUser,
+      setIsNewUser,
     }),
-    [token, transactions, budgets, totalBalance, colors, theme, username]
+    [token, transactions, budgets, totalBalance, colors, theme, username, hasSeenOnboarding, isNewUser]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
