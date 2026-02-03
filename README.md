@@ -12,14 +12,14 @@
 - 🎨 **ธีมสวยงาม** - รองรับหลายธีม (Emerald, Blue, Purple, Pink, Orange)
 - 🔐 **ระบบความปลอดภัย** - เข้ารหัสรหัสผ่านและใช้ JWT สำหรับการยืนยันตัวตน
 
-## 🛠️ Tech Stack
+🛠️ too
 
-- **Frontend**: React Native
-- **Backend**: Node.js + Express
-- **Database**: MySQL
-- **Authentication**: JWT (JSON Web Token)
-- **Icons**: React Native Vector Icons
-- **Charts**: react-native-chart-kit
+-React Native
+-Node.js Express
+-MySQL
+-JWT (JSON Web Token)
+-React Native Vector Icons
+-react-native-chart-kit
 
 ## 📋 Prerequisites
 
@@ -28,7 +28,7 @@
 - React Native development environment
 - Android Studio (สำหรับ Android) หรือ Xcode (สำหรับ iOS)
 
-## 🚀 Installation
+🚀Installation
 
 1. **Clone repository**
 ```bash
@@ -132,4 +132,4 @@ This project is licensed under the MIT License.
 
 ---
 
-Made with ❤️ using React Native
+
