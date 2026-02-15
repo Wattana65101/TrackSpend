@@ -111,7 +111,7 @@ export default function LoginScreen({ navigation }) {
 
         {/* Header Content */}
         <View style={styles.headerContent}>
-          <Text style={styles.appTitle}>MoneyGrow</Text>
+          <Text style={styles.appTitle}>TrackSpend</Text>
           <Text style={styles.appSubtitle}>จัดการเงินให้งอกเงย</Text>
         </View>
 

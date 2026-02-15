@@ -63,10 +63,12 @@ const verifyToken = (req, res, next) => {
 
 // ✅ Register
 app.post("/api/register", (req, res) => {
-  console.log("📥 Received register request:", { 
+  console.log("📥 Received register request at:", new Date().toISOString());
+  console.log("📥 Request body:", { 
     username: req.body.username, 
     email: req.body.email, 
-    phone: req.body.phone 
+    phone: req.body.phone,
+    hasPassword: !!req.body.password
   });
   
   // ตรวจสอบว่า database connected หรือไม่

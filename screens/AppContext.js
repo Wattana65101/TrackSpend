@@ -25,7 +25,7 @@ const hexToRgbA = (hex, alpha) => {
 };
 
 const themes = {
-  // ธีมหลัก: MoneyGrow Emerald (Default) - ปรับความเข้มให้หลากหลาย
+  // ธีมหลัก: TrackSpend Emerald (Default) - ปรับความเข้มให้หลากหลาย
   emerald: {
     primary: "#059669", // emerald-600 - สีเขียวหลัก
     primaryLight: "#10B981", // emerald-500 - สีเขียวอ่อน
@@ -216,9 +216,10 @@ export function AppProvider({ children }) {
   const [transactions, setTransactions] = useState(null); // null = ยังไม่ได้ fetch, [] = fetch แล้วแต่ไม่มีข้อมูล
   const [budgets, setBudgets] = useState([]);
   const [totalBalance, setTotalBalance] = useState(0);
-  const [theme, setTheme] = useState("emerald"); // ✅ default emerald theme (MoneyGrow)
+  const [theme, setTheme] = useState("emerald"); // ✅ default emerald theme (TrackSpend)
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(null); // null = กำลังโหลด, true/false = โหลดเสร็จ
   const [isNewUser, setIsNewUser] = useState(false); // เช็คว่าเป็นบัญชีใหม่หรือไม่
+  const [hasCheckedNewUser, setHasCheckedNewUser] = useState(false); // เช็คว่าเคยเช็คบัญชีใหม่แล้วหรือยัง (ป้องกันเช็คซ้ำ)
   const colors = themes[theme] || themes.emerald;
 
   // Helper function สำหรับล้าง token เมื่อหมดอายุ
@@ -247,16 +248,26 @@ export function AppProvider({ children }) {
         const transactionsData = JSON.parse(transactionsText);
         setTransactions(transactionsData);
         
-        // เช็คว่าเป็นบัญชีใหม่หรือไม่ (ไม่มี transactions = บัญชีใหม่)
-        const isNew = transactionsData.length === 0;
-        console.log("🔍 Checking if new user:", { transactionsCount: transactionsData.length, isNew });
-        setIsNewUser(isNew);
-        
-        // ถ้าเป็นบัญชีใหม่ ให้ลบ hasSeenOnboarding เพื่อให้แสดง onboarding
-        if (isNew) {
-          await AsyncStorage.removeItem("hasSeenOnboarding");
-          setHasSeenOnboarding(false);
-          console.log("✅ New user detected, clearing onboarding status");
+        // เช็คว่าเป็นบัญชีใหม่หรือไม่ (เฉพาะตอน login ครั้งแรกเท่านั้น)
+        // แสดง onboarding เฉพาะเมื่อ: ไม่มี transactions, และยังไม่เคยดู onboarding, และยังไม่เคยเช็ค
+        // ใช้ hasCheckedNewUser จาก dependency array (จะได้ค่าใหม่ทุกครั้งที่ state เปลี่ยน)
+        if (!hasCheckedNewUser && transactionsData.length === 0) {
+          const hasSeenStored = await AsyncStorage.getItem("hasSeenOnboarding");
+          const hasSeenValue = hasSeenStored === "true";
+          
+          if (!hasSeenValue) {
+            setIsNewUser(true);
+            setHasSeenOnboarding(false);
+            setHasCheckedNewUser(true);
+            console.log("✅ New user detected on first login - will show onboarding");
+          } else {
+            setIsNewUser(false);
+            setHasCheckedNewUser(true);
+          }
+        } else if (!hasCheckedNewUser) {
+          // ถ้ามี transactions = ไม่ใช่บัญชีใหม่
+          setIsNewUser(false);
+          setHasCheckedNewUser(true);
         }
       } else {
         // ถ้าเป็น 401 หรือ 403 แสดงว่า token หมดอายุหรือไม่ถูกต้อง
@@ -286,7 +297,7 @@ export function AppProvider({ children }) {
     } catch (error) {
       console.error("🔥 Error fetching data:", error);
     }
-  }, [token, clearTokenAndLogout, setHasSeenOnboarding, setIsNewUser]);
+  }, [token, clearTokenAndLogout, setHasSeenOnboarding, setIsNewUser, hasCheckedNewUser]);
 
   // ลบ transaction
   const deleteTransaction = async (id) => {
@@ -473,6 +484,14 @@ export function AppProvider({ children }) {
       setIsNewUser(false); // รีเซ็ต isNewUser เมื่อ logout
     }
   }, [token, fetchTransactionsAndBudgets, fetchUserProfile]);
+
+  // รีเซ็ต hasCheckedNewUser เมื่อ logout
+  useEffect(() => {
+    if (!token) {
+      setHasCheckedNewUser(false);
+      setIsNewUser(false);
+    }
+  }, [token]);
 
   const value = useMemo(
     () => ({

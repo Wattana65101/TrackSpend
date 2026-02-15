@@ -92,7 +92,7 @@ export default function RegisterScreen({ navigation }) {
     // Validate phone number - must be exactly 10 digits
     const phoneDigits = phone.replace(/\D/g, ""); // ลบตัวอักษรที่ไม่ใช่ตัวเลข
     if (phoneDigits.length !== 10) {
-      // ไม่แสดง error message ตามที่ผู้ใช้ขอ
+      Alert.alert("❌ ล้มเหลว", `เบอร์โทรศัพท์ต้องเป็น 10 ตัวเลข\nปัจจุบัน: ${phoneDigits.length} ตัว`);
       return;
     }
 
@@ -128,8 +128,16 @@ export default function RegisterScreen({ navigation }) {
       
       const response = await fetch(`${BASE_URL}/api/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         body: JSON.stringify(requestData),
+      }).catch((fetchError) => {
+        console.error("🔥 Fetch error:", fetchError);
+        Alert.alert("❌ ข้อผิดพลาด", `ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้\n${fetchError.message}`);
+        setLoading(false);
+        throw fetchError;
       });
 
       console.log("📥 Response status:", response.status);
