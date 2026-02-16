@@ -2,12 +2,23 @@ import React, { useContext, useState, useEffect } from "react";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { AppProvider, AppContext } from "./screens/AppContext";
 import AppNavigator from "./screens/AppNavigator";
 import AuthStack from "./screens/AuthStack";
 import OnboardingScreen from "./screens/OnboardingScreen";
 
+const { GOOGLE_WEB_CLIENT_ID } = require("./config/google.js");
+
 function MainApp() {
+  useEffect(() => {
+    if (__DEV__) {
+      console.log("[Google Sign-In] webClientId:", GOOGLE_WEB_CLIENT_ID?.substring(0, 30) + "...");
+    }
+    GoogleSignin.configure({
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+    });
+  }, []);
   const { token, hasSeenOnboarding, setHasSeenOnboarding, isNewUser, setIsNewUser, transactions } = useContext(AppContext);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
@@ -37,18 +48,8 @@ function MainApp() {
     );
   }
 
-  // Debug: เช็คเงื่อนไข
-  console.log("🔍 Onboarding Check:", {
-    token: !!token,
-    isNewUser,
-    hasSeenOnboarding,
-    transactionsCount: transactions?.length || 0,
-    isLoadingData,
-  });
-
   // แสดง onboarding เฉพาะเมื่อ: มี token, เป็นบัญชีใหม่, และยังไม่เคยดู onboarding
   if (token && isNewUser === true && hasSeenOnboarding === false) {
-    console.log("✅ Showing onboarding screen");
     return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 

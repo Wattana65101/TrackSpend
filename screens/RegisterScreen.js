@@ -12,15 +12,17 @@ import {
   ScrollView,
   Dimensions,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { AppContext } from "./AppContext";
 import AppLogo from "../components/AppLogo";
 
 const { width } = Dimensions.get("window");
 
 export default function RegisterScreen({ navigation }) {
-  const { colors, BASE_URL, hexToRgbA } = useContext(AppContext);
-  const [username, setUsername] = useState("");
+  const { colors, BASE_URL, hexToRgbA, setToken, setUsername } = useContext(AppContext);
+  const [usernameInput, setUsernameInput] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -65,7 +67,7 @@ export default function RegisterScreen({ navigation }) {
 
   // Progress animation based on filled fields
   useEffect(() => {
-    const filledFields = [username, phone, email, password, confirmPassword].filter(
+    const filledFields = [usernameInput, phone, email, password, confirmPassword].filter(
       (field) => field.length > 0
     ).length;
     const progress = filledFields / 5;
@@ -75,7 +77,7 @@ export default function RegisterScreen({ navigation }) {
       duration: 300,
       useNativeDriver: false,
     }).start();
-  }, [username, phone, email, password, confirmPassword]);
+  }, [usernameInput, phone, email, password, confirmPassword]);
 
   // Email validation function
   const isValidEmail = (email) => {
@@ -84,7 +86,7 @@ export default function RegisterScreen({ navigation }) {
   };
 
   const handleRegister = async () => {
-    if (!username || !phone || !email || !password || !confirmPassword) {
+    if (!usernameInput || !phone || !email || !password || !confirmPassword) {
       Alert.alert("❌ ล้มเหลว", "กรุณากรอกข้อมูลให้ครบถ้วน");
       return;
     }
@@ -117,7 +119,7 @@ export default function RegisterScreen({ navigation }) {
       // ใช้ phoneDigits ที่ลบตัวอักษรที่ไม่ใช่ตัวเลขแล้ว
       const phoneDigits = phone.replace(/\D/g, "");
       const requestData = {
-        username,
+        username: usernameInput,
         phone: phoneDigits, // ส่งเฉพาะตัวเลข
         email,
         password,
@@ -193,6 +195,55 @@ export default function RegisterScreen({ navigation }) {
       } else {
         Alert.alert("❌ ข้อผิดพลาด", `เกิดข้อผิดพลาด: ${error.message || "ไม่ทราบสาเหตุ"}`);
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // สมัคร/เข้าสู่ระบบด้วย Google (ส่ง idToken ไปเซิร์ฟเวอร์ → สร้างหรือหาบัญชี → บันทึกลง DB)
+  const handleGoogleRegister = async () => {
+    setLoading(true);
+    try {
+      await GoogleSignin.hasPlayServices();
+      const signInResult = await GoogleSignin.signIn();
+      if (signInResult?.type !== "success" || !signInResult?.data) {
+        setLoading(false);
+        return;
+      }
+      const { idToken } = await GoogleSignin.getTokens();
+      if (!idToken) {
+        Alert.alert("❌ ล้มเหลว", "ไม่สามารถดึงข้อมูลจาก Google ได้");
+        setLoading(false);
+        return;
+      }
+      const response = await fetch(`${BASE_URL}/api/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        Alert.alert("❌ ข้อผิดพลาด", "ได้รับ response ที่ไม่ถูกต้องจากเซิร์ฟเวอร์");
+        setLoading(false);
+        return;
+      }
+      const data = await response.json();
+      if (response.ok && data.success && data.token) {
+        await AsyncStorage.setItem("token", data.token);
+        setToken(data.token);
+        if (data.username) {
+          setUsername(data.username);
+          await AsyncStorage.setItem("username", data.username);
+        }
+        Alert.alert("✅ สำเร็จ", data.message || "สมัคร/เข้าสู่ระบบด้วย Google เรียบร้อย!", [
+          { text: "ตกลง" },
+        ]);
+      } else {
+        Alert.alert("❌ ล้มเหลว", data.message || "ไม่สามารถสมัครด้วย Google ได้");
+      }
+    } catch (error) {
+      console.error("Google register error:", error);
+      Alert.alert("Error", "เกิดข้อผิดพลาดในการสมัครด้วย Google");
     } finally {
       setLoading(false);
     }
@@ -335,9 +386,9 @@ export default function RegisterScreen({ navigation }) {
                 ]}
               >
                 <Ionicons
-                  name={isFieldFocused("username") || isFieldFilled(username) ? "person" : "person-outline"}
+                  name={isFieldFocused("username") || isFieldFilled(usernameInput) ? "person" : "person-outline"}
                   size={20}
-                  color={isFieldFocused("username") || isFieldFilled(username) ? colors.primary : colors.subtext}
+                  color={isFieldFocused("username") || isFieldFilled(usernameInput) ? colors.primary : colors.subtext}
                 />
               </View>
               <TextInput
@@ -355,8 +406,8 @@ export default function RegisterScreen({ navigation }) {
                 ]}
                 placeholder="ชื่อผู้ใช้"
                 placeholderTextColor={colors.subtext}
-                value={username}
-                onChangeText={setUsername}
+                value={usernameInput}
+                onChangeText={setUsernameInput}
                 onFocus={() => setFocusedField("username")}
                 onBlur={() => setFocusedField(null)}
                 autoCapitalize="words"
@@ -633,6 +684,24 @@ export default function RegisterScreen({ navigation }) {
                 </View>
               )}
             </TouchableOpacity>
+
+            {/* สมัครด้วย Google */}
+            <TouchableOpacity
+              style={[
+                styles.googleButton,
+                { opacity: loading ? 0.7 : 1, borderColor: colors.subtextLight },
+              ]}
+              onPress={handleGoogleRegister}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              <View style={styles.buttonContent}>
+                <Ionicons name="logo-google" size={20} color="#1E293B" />
+                <Text style={[styles.googleButtonText, { color: colors.text }]}>
+                  สมัครด้วย Google
+                </Text>
+              </View>
+            </TouchableOpacity>
           </View>
 
           {/* Login Link */}
@@ -881,6 +950,21 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 18,
+  },
+  googleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    paddingVertical: 16,
+    marginTop: 12,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 2,
+  },
+  googleButtonText: {
+    fontWeight: "800",
+    fontSize: 16,
+    marginLeft: 8,
   },
   loadingContainer: {
     flexDirection: "row",

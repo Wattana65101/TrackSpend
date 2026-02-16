@@ -1,0 +1,17 @@
+{
+  "installed": {
+    "client_id": "660835922057-mup0rn0bl5v1t17bid0caljvsa8nqspo.apps.googleusercontent.com",
+    "project_id": "teackspemd",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+  },
+  "web": {
+    "client_id": "660835922057-ag4kgdpq4jnt7gkektt7h3suml230mbj.apps.googleusercontent.com",
+    "project_id": "teackspemd",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
+  },
+  "offline_access": true
+} 

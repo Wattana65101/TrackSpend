@@ -14,7 +14,6 @@ import {
 import { AppContext, expenseCategories } from "./AppContext";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Picker } from "@react-native-picker/picker";
 
 const ProgressBar = ({ progress, colors, hexToRgbA }) => {
   const progressColor =
@@ -175,8 +174,9 @@ export default function BudgetScreen() {
           (t) => t.type === "expense" && t.category === budget.category
         )
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-      return { ...budget, spent };
+      const categoryInfo = expenseCategories.find((c) => c.name === budget.category);
+      const icon = categoryInfo?.icon || "pie-chart-outline";
+      return { ...budget, spent, icon };
     });
   }, [budgets, transactions]);
 
@@ -382,29 +382,69 @@ export default function BudgetScreen() {
               <Text style={[styles.modalLabel, { color: colors.text }]}>
                 หมวดหมู่
               </Text>
-              <View
+              <ScrollView
                 style={[
-                  styles.pickerContainer,
+                  styles.categoryListContainer,
                   {
                     backgroundColor: colors.backgroundLight || colors.background,
                     borderColor: hexToRgbA(colors.primary, 0.2),
                   },
                 ]}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
               >
-                <Picker
-                  selectedValue={newCategory}
-                  onValueChange={(itemValue) => setNewCategory(itemValue)}
-                  style={{ color: colors.text }}
-                >
-                  {expenseCategories.map((cat) => (
-                    <Picker.Item
+                {expenseCategories.map((cat) => {
+                  const isSelected = newCategory === cat.name;
+                  return (
+                    <TouchableOpacity
                       key={cat.name}
-                      label={cat.name}
-                      value={cat.name}
-                    />
-                  ))}
-                </Picker>
-              </View>
+                      style={[
+                        styles.categoryOptionRow,
+                        {
+                          backgroundColor: isSelected
+                            ? hexToRgbA(colors.primary, 0.12)
+                            : "transparent",
+                          borderLeftColor: isSelected
+                            ? colors.primary
+                            : "transparent",
+                        },
+                      ]}
+                      onPress={() => setNewCategory(cat.name)}
+                      activeOpacity={0.7}
+                    >
+                      <View
+                        style={[
+                          styles.categoryOptionIcon,
+                          {
+                            backgroundColor: hexToRgbA(colors.primary, 0.12),
+                          },
+                        ]}
+                      >
+                        <Ionicons
+                          name={cat.icon}
+                          size={22}
+                          color={colors.primary}
+                        />
+                      </View>
+                      <Text
+                        style={[
+                          styles.categoryOptionLabel,
+                          { color: colors.text },
+                        ]}
+                      >
+                        {cat.name}
+                      </Text>
+                      {isSelected && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={22}
+                          color={colors.primary}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
 
               <Text style={[styles.modalLabel, { color: colors.text }]}>
                 จำนวนเงิน
@@ -749,6 +789,32 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderWidth: 2,
     overflow: "hidden",
+  },
+  categoryListContainer: {
+    borderRadius: 16,
+    marginBottom: 20,
+    borderWidth: 2,
+    maxHeight: 280,
+  },
+  categoryOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderLeftWidth: 4,
+  },
+  categoryOptionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+  categoryOptionLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
   },
   modalInput: {
     height: 56,

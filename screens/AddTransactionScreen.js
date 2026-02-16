@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Keyboard,
   TouchableWithoutFeedback,
   Modal,
@@ -13,10 +12,10 @@ import {
   Alert,
   Dimensions,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppContext, expenseCategories, incomeCategories } from "./AppContext";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
@@ -79,6 +78,7 @@ export default function AddTransactionScreen() {
     fetchTransactionsAndBudgets,
     BASE_URL,
     hexToRgbA,
+    budgets,
   } = useContext(AppContext);
   const navigation = useNavigation();
   const route = useRoute();
@@ -93,7 +93,11 @@ export default function AddTransactionScreen() {
   const amountInputRef = useRef(null);
   const previousCategoryRef = useRef(null);
 
-  const categories = type === "expense" ? expenseCategories : incomeCategories;
+  const budgetCategoryNames = (budgets || []).map((b) => b.category);
+  const categories =
+    type === "expense"
+      ? expenseCategories.filter((cat) => budgetCategoryNames.includes(cat.name))
+      : incomeCategories;
 
   useEffect(() => {
     if (route.params?.type) {
@@ -103,6 +107,14 @@ export default function AddTransactionScreen() {
       setNote("");
     }
   }, [route.params?.type]);
+
+  // เคลียร์หมวดที่เลือกถ้าหมวดนั้นไม่มีในงบแล้ว (เฉพาะรายจ่าย)
+  useEffect(() => {
+    if (type === "expense" && selectedCategory && !budgetCategoryNames.includes(selectedCategory.name)) {
+      setSelectedCategory(null);
+      setAmount("");
+    }
+  }, [type, budgets, selectedCategory]);
 
   // Auto focus amount input when category is selected
   useEffect(() => {
@@ -282,8 +294,31 @@ export default function AddTransactionScreen() {
           >
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               เลือกหมวดหมู่
+              {type === "expense" && (
+                <Text style={[styles.sectionSubtitle, { color: colors.subtext }]}>
+                  {" "}(เฉพาะหมวดที่มีงบประมาณ)
+                </Text>
+              )}
             </Text>
             {!selectedCategory ? (
+              type === "expense" && categories.length === 0 ? (
+                <View style={styles.emptyCategoryWrap}>
+                  <Ionicons name="wallet-outline" size={40} color={colors.subtext} style={{ opacity: 0.5 }} />
+                  <Text style={[styles.emptyCategoryText, { color: colors.subtext }]}>
+                    ยังไม่มีงบประมาณ
+                  </Text>
+                  <Text style={[styles.emptyCategoryHint, { color: colors.subtext }]}>
+                    ไปตั้งงบที่หน้างบประมาณก่อน จึงจะเพิ่มรายจ่ายได้
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.goToBudgetButton, { backgroundColor: colors.primary }]}
+                    onPress={() => navigation.navigate("Budgets")}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.goToBudgetButtonText}>ไปตั้งงบประมาณ</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
               <View style={styles.categoryList}>
                 {categories.map((category) => (
                   <CategoryItem
@@ -291,7 +326,6 @@ export default function AddTransactionScreen() {
                     category={category}
                     isSelected={selectedCategory?.name === category.name}
                     onPress={(cat) => {
-                      // Reset amount if selecting a different category
                       if (selectedCategory?.name !== cat.name) {
                         setAmount("");
                       }
@@ -302,6 +336,7 @@ export default function AddTransactionScreen() {
                   />
                 ))}
               </View>
+              )
             ) : (
               <View>
                 <TouchableOpacity
@@ -592,8 +627,41 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     letterSpacing: 0.2,
   },
+  sectionSubtitle: {
+    fontSize: 13,
+    fontWeight: "400",
+  },
   categoryList: {
     gap: 8,
+  },
+  emptyCategoryWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+  },
+  emptyCategoryText: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 12,
+    textAlign: "center",
+  },
+  emptyCategoryHint: {
+    fontSize: 14,
+    marginTop: 6,
+    textAlign: "center",
+    opacity: 0.9,
+  },
+  goToBudgetButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  goToBudgetButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "600",
   },
   categoryItem: {
     flexDirection: "row",

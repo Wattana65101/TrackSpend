@@ -1,11 +1,13 @@
-const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+const { getDefaultConfig } = require('@react-native/metro-config');
 
 /**
  * Metro configuration
  * https://reactnative.dev/docs/metro
- *
- * @type {import('@react-native/metro-config').MetroConfig}
+ * รองรับไฟล์ .riv สำหรับ Rive animation
  */
-const config = {};
-
-module.exports = mergeConfig(getDefaultConfig(__dirname), config);
+const defaultConfig = getDefaultConfig(__dirname);
+const { assetExts } = defaultConfig.resolver;
+if (!assetExts.includes('riv')) {
+  defaultConfig.resolver.assetExts = [...assetExts, 'riv'];
+}
+module.exports = defaultConfig;

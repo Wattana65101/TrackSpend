@@ -9,10 +9,86 @@ import {
 import { AppContext, expenseCategories } from "./AppContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LineChart, PieChart } from "react-native-chart-kit";
+import { WebView } from "react-native-webview";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
+// สีไม่ซ้ำกันสำหรับแต่ละหมวดหมู่
+const CATEGORY_COLORS = [
+  "#EF4444", "#F59E0B", "#10B981", "#3B82F6", "#8B5CF6", "#EC4899",
+  "#06B6D4", "#84CC16", "#F97316", "#6366F1", "#14B8A6", "#A855F7",
+  "#E11D48", "#0EA5E9", "#22C55E", "#EAB308",
+];
+
+function getApexRadialBarHtml(data, width, height) {
+  const series = data.map((d) => Math.min(100, Math.round(d.percentUsed || 0)));
+  const labels = data.map((d) => d.name);
+  const colors = data.map((d) => d.color);
+  const totalSpent = data.reduce((sum, d) => sum + (isNaN(d.amount) ? 0 : Number(d.amount)), 0);
+  const totalStr = totalSpent.toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const totalStrEsc = totalStr.replace(/"/g, '\\"');
+  const seriesStr = JSON.stringify(series);
+  const labelsStr = JSON.stringify(labels).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+  const colorsStr = JSON.stringify(colors);
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+</head>
+<body style="margin:0;padding:0;background:transparent;">
+  <div id="chart" style="width:100%;min-height:${height}px;"></div>
+  <script>
+    (function() {
+      var options = {
+        series: ${seriesStr},
+        chart: { height: ${height}, width: ${width}, type: 'radialBar' },
+        plotOptions: {
+          radialBar: {
+            offsetY: 0,
+            startAngle: 0,
+            endAngle: 270,
+            hollow: {
+              margin: 5,
+              size: '30%',
+              background: 'transparent'
+            },
+            track: { background: 'rgba(0,0,0,0.06)' },
+            dataLabels: {
+              name: { show: false },
+              value: { show: false },
+              total: {
+                show: true,
+                label: 'รวมใช้ไป',
+                formatter: function() { return '฿' + "${totalStrEsc}"; }
+              }
+            },
+            barLabels: {
+              enabled: true,
+              useSeriesColors: true,
+              offsetX: -8,
+              fontSize: '13px',
+              formatter: function(seriesName, opts) {
+                var val = opts.w.globals.series[opts.seriesIndex];
+                return seriesName + ":  " + val + "%";
+              }
+            }
+          }
+        },
+        colors: ${colorsStr},
+        labels: ${labelsStr},
+        legend: { show: false }
+      };
+      var chart = new ApexCharts(document.querySelector("#chart"), options);
+      chart.render();
+    })();
+  <\/script>
+</body>
+</html>`;
+}
+
 export default function ReportsScreen() {
-  const { transactions, colors, hexToRgbA } = useContext(AppContext);
+  const { transactions, budgets, colors, hexToRgbA } = useContext(AppContext);
   const insets = useSafeAreaInsets();
   const screenWidth = Dimensions.get("window").width;
 
@@ -31,13 +107,33 @@ export default function ReportsScreen() {
         return {
           name: cat.name,
           amount: total,
-          color: colors?.expenseLight || colors?.expense,
+          color: CATEGORY_COLORS[index % CATEGORY_COLORS.length],
           legendFontColor: colors?.text,
           legendFontSize: 12,
         };
       })
       .filter((item) => item.amount > 0);
   }, [transactions, colors]);
+
+  const budgetChartData = useMemo(() => {
+    if (!transactions || !budgets || !budgets.length) return [];
+    return budgets.map((budget, index) => {
+      const spent = transactions
+        .filter((t) => t.type === "expense" && t.category === budget.category)
+        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+      const limit = Number(budget.limit) || 0;
+      const percentUsed = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
+      const catIndex = expenseCategories.findIndex((c) => c.name === budget.category);
+      const color = CATEGORY_COLORS[catIndex >= 0 ? catIndex % CATEGORY_COLORS.length : index % CATEGORY_COLORS.length];
+      return {
+        name: budget.category,
+        amount: spent,
+        limit,
+        percentUsed,
+        color,
+      };
+    });
+  }, [transactions, budgets]);
 
   const incomeData = useMemo(() => {
     if (!transactions) return [];
@@ -128,26 +224,13 @@ export default function ReportsScreen() {
     };
   }, [transactions, colors]);
 
-  const totalIncome = useMemo(() => {
-    if (!transactions) return 0;
-    return transactions
-      .filter((t) => t.type === "income")
-      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-  }, [transactions]);
-
-  const totalExpense = useMemo(() => {
-    if (!transactions) return 0;
-    return transactions
-      .filter((t) => t.type === "expense")
-      .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-  }, [transactions]);
-
   return (
     <ScrollView
       style={[
         styles.container,
         { backgroundColor: colors?.background, paddingTop: insets.top + 10 },
       ]}
+      contentContainerStyle={{ paddingBottom: (insets.bottom || 20) + 72 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
@@ -156,65 +239,6 @@ export default function ReportsScreen() {
           <Text style={[styles.title, { color: colors?.text }]}>รายงาน</Text>
           <Text style={[styles.subtitle, { color: colors?.subtext }]}>
             สรุปการเงินของคุณ
-          </Text>
-        </View>
-      </View>
-
-      {/* Summary Cards */}
-      <View style={styles.summaryRow}>
-        <View
-          style={[
-            styles.summaryCard,
-            {
-              backgroundColor: hexToRgbA(colors?.income, 0.1),
-              borderColor: hexToRgbA(colors?.income, 0.3),
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.summaryIcon,
-              { backgroundColor: hexToRgbA(colors?.income, 0.2) },
-            ]}
-          >
-            <Ionicons name="arrow-down-circle" size={24} color={colors?.income} />
-          </View>
-          <Text style={[styles.summaryLabel, { color: colors?.subtext }]}>
-            รายรับรวม
-          </Text>
-          <Text style={[styles.summaryValue, { color: colors?.income }]}>
-            ฿{totalIncome.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.summaryCard,
-            {
-              backgroundColor: hexToRgbA(colors?.expense, 0.1),
-              borderColor: hexToRgbA(colors?.expense, 0.3),
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.summaryIcon,
-              { backgroundColor: hexToRgbA(colors?.expense, 0.2) },
-            ]}
-          >
-            <Ionicons name="arrow-up-circle" size={24} color={colors?.expense} />
-          </View>
-          <Text style={[styles.summaryLabel, { color: colors?.subtext }]}>
-            รายจ่ายรวม
-          </Text>
-          <Text style={[styles.summaryValue, { color: colors?.expense }]}>
-            ฿{totalExpense.toLocaleString(undefined, {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
           </Text>
         </View>
       </View>
@@ -337,8 +361,8 @@ export default function ReportsScreen() {
         )}
       </View>
 
-      {/* Pie Chart รายจ่ายตามหมวดหมู่ */}
-      {expenseData.length > 0 && (
+      {/* ApexCharts RadialBar ใช้ไปเทียบงบ - แสดงเฉพาะหมวดที่มีการใช้จ่าย */}
+      {budgetChartData.length > 0 && (
         <View
           style={[
             styles.card,
@@ -358,49 +382,26 @@ export default function ReportsScreen() {
               <Ionicons name="pie-chart" size={20} color={colors?.primary} />
             </View>
             <Text style={[styles.sectionTitle, { color: colors?.text }]}>
-              รายจ่ายตามหมวดหมู่
+              แผนภูมิรายจ่ายตามหมวดหมู่
             </Text>
           </View>
-          <PieChart
-            data={expenseData.map((item) => ({
-              name: item.name,
-              population: !isNaN(item.amount) ? item.amount : 0,
-              color: item.color,
-              legendFontColor: item.legendFontColor,
-              legendFontSize: item.legendFontSize,
-            }))}
-            width={screenWidth - 80}
-            height={220}
-            chartConfig={{
-              backgroundColor: colors?.card,
-              backgroundGradientFrom: colors?.card,
-              backgroundGradientTo: colors?.card,
-              color: () => colors?.text,
-            }}
-            accessor="population"
-            backgroundColor="transparent"
-            paddingLeft="15"
-            absolute
-          />
-          <View style={styles.legendContainer}>
-            {expenseData.map((item, index) => (
-              <View key={index} style={styles.legendItem}>
-                <View
-                  style={[
-                    styles.legendColor,
-                    { backgroundColor: item.color },
-                  ]}
-                />
-                <Text style={[styles.legendText, { color: colors?.text }]}>
-                  {item.name}: ฿
-                  {(!isNaN(item.amount) ? item.amount : 0).toLocaleString(
-                    undefined,
-                    { minimumFractionDigits: 2 }
-                  )}
-                </Text>
-              </View>
-            ))}
-          </View>
+          {budgetChartData.filter((b) => Number(b.amount) > 0).length > 0 ? (
+            <View style={[styles.apexChartWrap, { height: 320 }]}>
+              <WebView
+                source={{ html: getApexRadialBarHtml(budgetChartData.filter((b) => Number(b.amount) > 0), screenWidth - 80, 280) }}
+                style={{ backgroundColor: "transparent" }}
+                scrollEnabled={false}
+                originWhitelist={["*"]}
+              />
+            </View>
+          ) : (
+            <View style={styles.emptyChart}>
+              <Ionicons name="wallet-outline" size={48} color={colors?.subtext} style={{ opacity: 0.3 }} />
+              <Text style={[styles.emptyChartText, { color: colors?.subtext }]}>
+                แสดงเมื่อมีการใช้รายจ่ายในงบ
+              </Text>
+            </View>
+          )}
         </View>
       )}
     </ScrollView>
@@ -423,35 +424,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     fontWeight: "500",
-  },
-  summaryRow: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    marginBottom: 20,
-    gap: 12,
-  },
-  summaryCard: {
-    flex: 1,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 2,
-  },
-  summaryIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  summaryLabel: {
-    fontSize: 13,
-    marginBottom: 8,
-    fontWeight: "500",
-  },
-  summaryValue: {
-    fontSize: 20,
-    fontWeight: "700",
   },
   card: {
     marginHorizontal: 20,
@@ -489,9 +461,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 12,
   },
+  apexChartWrap: {
+    width: "100%",
+    overflow: "hidden",
+  },
+  legendTitle: {
+    fontSize: 13,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  legendSubtitle: {
+    fontSize: 11,
+    marginBottom: 10,
+    opacity: 0.9,
+  },
   legendContainer: {
-    marginTop: 16,
-    gap: 8,
+    marginTop: 4,
+    gap: 6,
   },
   legendItem: {
     flexDirection: "row",
@@ -502,6 +488,9 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
+  },
+  legendTextWrap: {
+    flex: 1,
   },
   legendText: {
     fontSize: 14,

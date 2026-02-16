@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useState } from "react";
+import React, { useContext, useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,12 +6,13 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  Pressable,
 } from "react-native";
 import { AppContext, expenseCategories, incomeCategories } from "./AppContext";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
-// นำเข้าเฉพาะ BarChart
-import { BarChart } from "react-native-chart-kit";
+// สัปดาห์ = Area (LineChart + shadow), เดือน = Line (LineChart ไม่มี shadow)
+import { LineChart } from "react-native-chart-kit";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
@@ -21,9 +22,10 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const screenWidth = Dimensions.get("window").width;
   const [timeRange, setTimeRange] = useState("month"); // "week" or "month"
-  // ลบ chartType state ออก เพราะเหลือแค่ Bar Chart อย่างเดียว
+  const [chartTooltip, setChartTooltip] = useState(null); // { label, income, expense, x, y, dateLabel } or null
+  const CHART_PADDING_RIGHT = 64;
 
-  // ✅ datasets สรุปรายสัปดาห์
+  // ✅ datasets สรุปรายสัปดาห์ (7 วัน)
   const weeklyData = useMemo(() => {
     if (!transactions) {
       return {
@@ -121,6 +123,56 @@ export default function HomeScreen() {
 
   // เลือกข้อมูลตาม timeRange
   const chartData = timeRange === "month" ? monthlyData : weeklyData;
+
+  const chartWidth = timeRange === "week" ? screenWidth - 48 : Math.max(screenWidth - 80, chartData.labels.length * 70);
+  const chartHeight = 200;
+
+  const showTooltipAtChartPosition = useCallback(
+    (chartX, chartY) => {
+      if (!chartData.labels.length) return;
+      const dataWidth = chartWidth - CHART_PADDING_RIGHT;
+      const rawIndex = (chartX / dataWidth) * (chartData.labels.length - 1);
+      const index = Math.max(0, Math.min(chartData.labels.length - 1, Math.round(rawIndex)));
+      const label = chartData.labels[index];
+      const income = chartData.datasets[0]?.data[index] ?? 0;
+      const expense = chartData.datasets[1]?.data[index] ?? 0;
+
+      let dateLabel = "";
+      const now = new Date();
+      if (timeRange === "week") {
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        const d = new Date(startOfWeek);
+        d.setDate(startOfWeek.getDate() + index);
+        const day = d.getDate();
+        const month = d.getMonth();
+        const year = d.getFullYear() + 543;
+        const monthsShort = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+        dateLabel = `${day} ${monthsShort[month]} ${year}`;
+      } else {
+        const monthIndex = index;
+        const yearAd = now.getFullYear() + (monthIndex > now.getMonth() ? -1 : 0);
+        const yearBe = yearAd + 543;
+        const monthsShort = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+        dateLabel = `${monthsShort[monthIndex]} ${yearBe}`;
+      }
+
+      setChartTooltip({ label, income, expense, x: chartX, y: chartY, dateLabel });
+    },
+    [chartData, chartWidth, timeRange]
+  );
+
+  const handleChartPressIn = useCallback(
+    (evt) => {
+      const { locationX, locationY } = evt.nativeEvent;
+      showTooltipAtChartPosition(locationX, locationY);
+    },
+    [showTooltipAtChartPosition]
+  );
+
+  const handleChartPressOut = useCallback(() => {
+    setChartTooltip(null);
+  }, []);
 
   const recentTransactionsWithIcons = useMemo(() => {
     if (!transactions) return [];
@@ -304,7 +356,7 @@ export default function HomeScreen() {
                 กราฟสรุป{timeRange === "month" ? "รายเดือน" : "รายสัปดาห์"}
               </Text>
               <Text style={[styles.cardSubtitle, { color: colors?.subtext }]}>
-                {timeRange === "month" ? "12 เดือนล่าสุด" : "7 วันล่าสุด"}
+                {timeRange === "month" ? "12 เดือนล่าสุด" : "7 วัน"}
               </Text>
             </View>
           </View>
@@ -372,6 +424,9 @@ export default function HomeScreen() {
                 <View style={[styles.legendDot, { backgroundColor: colors?.expense }]} />
                 <Text style={[styles.legendText, { color: colors?.subtext }]}>รายจ่าย</Text>
               </View>
+              <Text style={[styles.legendHint, { color: colors?.subtext }]}>
+                กดค้างบนกราฟเพื่อดูรายละเอียด
+              </Text>
             </View>
             {/* Summary Stats */}
             <View style={[styles.chartSummary, { backgroundColor: hexToRgbA(colors?.subtext, 0.05) }]}>
@@ -395,62 +450,109 @@ export default function HomeScreen() {
               </View>
             </View>
             
-            {/* แสดง BarChart พร้อม horizontal scroll */}
+            {/* สัปดาห์ = AREA อยู่หน้าเดียว | เดือน = LINE เลื่อนดูได้ | กราฟไม่แย่ง touch (pointerEvents="none") */}
             <ScrollView
               horizontal
-              showsHorizontalScrollIndicator={true}
-              contentContainerStyle={{ paddingRight: 20 }}
+              showsHorizontalScrollIndicator={timeRange === "month"}
+              contentContainerStyle={{ paddingRight: timeRange === "month" ? 20 : 0 }}
               style={{ marginTop: 10 }}
+              scrollEnabled={timeRange === "month"}
             >
-              <BarChart
-                data={{
-                  labels: chartData.labels,
-                  datasets: [
-                    {
-                      data: chartData.datasets[0]?.data || [],
-                    },
-                  ],
-                }}
-                width={Math.max(screenWidth - 80, chartData.labels.length * 70)}
-                height={200}
-                chartConfig={{
-                  backgroundColor: colors?.card,
-                  backgroundGradientFrom: colors?.card,
-                  backgroundGradientTo: colors?.card,
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => colors?.income || "#10B981",
-                  labelColor: (opacity = 1) => colors?.subtext,
-                  propsForBackgroundLines: {
-                    strokeDasharray: "",
-                    stroke: hexToRgbA(colors?.subtext, 0.15),
-                    strokeWidth: 1,
-                  },
-                  propsForVerticalLabels: {
-                    fontSize: 11,
-                  },
-                  propsForHorizontalLabels: {
-                    fontSize: 11,
-                  },
-                }}
-                style={{ borderRadius: 16 }}
-                withInnerLines={true}
-                withOuterLines={false}
-                withVerticalLabels={true}
-                withHorizontalLabels={true}
-                segments={4}
-                formatYLabel={(value) => {
-                  const num = parseFloat(value);
-                  if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
-                  return num.toString();
-                }}
-                showValuesOnTopOfBars={false}
-              />
+              <View style={{ width: chartWidth, height: chartHeight }}>
+                <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                  <LineChart
+                      data={{
+                        labels: chartData.labels,
+                        datasets: [
+                          {
+                            data: chartData.datasets[0]?.data || [],
+                            color: (opacity = 1) => hexToRgbA(colors?.income || "#10B981", opacity),
+                            strokeWidth: 2,
+                          },
+                          {
+                            data: chartData.datasets[1]?.data || [],
+                            color: (opacity = 1) => hexToRgbA(colors?.expense || "#EF4444", opacity),
+                            strokeWidth: 2,
+                          },
+                        ],
+                      }}
+                      width={chartWidth}
+                      height={chartHeight}
+                      chartConfig={{
+                        backgroundColor: colors?.card,
+                        backgroundGradientFrom: colors?.card,
+                        backgroundGradientTo: colors?.card,
+                        decimalPlaces: 0,
+                        color: (opacity = 1) => colors?.income || "#10B981",
+                        labelColor: (opacity = 1) => colors?.subtext,
+                        useShadowColorFromDataset: true,
+                        propsForBackgroundLines: {
+                          strokeDasharray: "",
+                          stroke: hexToRgbA(colors?.subtext, 0.15),
+                          strokeWidth: 1,
+                        },
+                        propsForVerticalLabels: { fontSize: 11 },
+                        propsForHorizontalLabels: { fontSize: 11 },
+                      }}
+                      style={{ borderRadius: 16 }}
+                      withInnerLines={true}
+                      withOuterLines={false}
+                      withVerticalLabels={true}
+                      withHorizontalLabels={true}
+                      withDots={false}
+                      withShadow={timeRange === "week"}
+                      withScrollableDot={false}
+                      bezier
+                      segments={4}
+                      fromZero
+                      formatYLabel={(value) => {
+                        const num = parseFloat(value);
+                        if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
+                        return num.toString();
+                      }}
+                    />
+                </View>
+                <Pressable
+                  style={StyleSheet.absoluteFill}
+                  onPressIn={handleChartPressIn}
+                  onPressOut={handleChartPressOut}
+                  onPressCancel={handleChartPressOut}
+                />
+                {chartTooltip && (
+                  <View
+                    style={[
+                      styles.chartTooltipBox,
+                      {
+                        backgroundColor: hexToRgbA(colors?.text ?? "#111", 0.92),
+                        left: Math.max(4, Math.min(chartWidth - 110, chartTooltip.x - 55)),
+                        top: Math.max(4, chartTooltip.y - 62),
+                      },
+                    ]}
+                    pointerEvents="none"
+                  >
+                    <Text style={[styles.chartTooltipLabel, { color: colors?.card ?? "#fff" }]}>
+                      {chartTooltip.label}
+                    </Text>
+                    {chartTooltip.dateLabel ? (
+                      <Text style={[styles.chartTooltipDate, { color: hexToRgbA(colors?.card ?? "#fff", 0.85) }]}>
+                        {chartTooltip.dateLabel}
+                      </Text>
+                    ) : null}
+                    <Text style={[styles.chartTooltipIncome, { color: colors?.income || "#10B981" }]}>
+                      รายรับ ฿{Number(chartTooltip.income).toLocaleString("th-TH", { maximumFractionDigits: 0 })}
+                    </Text>
+                    <Text style={[styles.chartTooltipExpense, { color: colors?.expense || "#EF4444" }]}>
+                      รายจ่าย ฿{Number(chartTooltip.expense).toLocaleString("th-TH", { maximumFractionDigits: 0 })}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </ScrollView>
           </>
         )}
         {chartData.labels.length === 0 && (
           <View style={styles.emptyChart}>
-            <Ionicons name="bar-chart-outline" size={48} color={colors?.subtext} style={{ opacity: 0.3 }} />
+            <Ionicons name="stats-chart-outline" size={48} color={colors?.subtext} style={{ opacity: 0.3 }} />
             <Text style={[styles.emptyChartText, { color: colors?.subtext }]}>
               ยังไม่มีข้อมูล
             </Text>
@@ -813,6 +915,36 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
+  },
+  legendHint: {
+    fontSize: 10,
+    opacity: 0.8,
+    marginLeft: 8,
+    alignSelf: "center",
+  },
+  chartTooltipBox: {
+    position: "absolute",
+    width: 110,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  chartTooltipLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    marginBottom: 1,
+  },
+  chartTooltipDate: {
+    fontSize: 10,
+    marginBottom: 3,
+  },
+  chartTooltipIncome: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  chartTooltipExpense: {
+    fontSize: 10,
+    fontWeight: "600",
   },
   emptyChart: {
     alignItems: "center",

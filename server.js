@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const mysql = require("mysql2");
 const bcrypt = require("bcryptjs");
@@ -159,6 +160,85 @@ app.post("/api/login", (req, res) => {
       phone: user.phone,       // ✅ ส่ง phone กลับไปด้วย
     });
   });
+});
+
+// ✅ Google Login (ตรวจ idToken กับ Google แล้วสร้าง/เข้าบัญชี)
+// รองรับทั้ง Web และ Android client เพราะ idToken จากแอปอาจมี aud เป็นตัวใดตัวหนึ่ง
+const GOOGLE_WEB_CLIENT_ID = process.env.GOOGLE_WEB_CLIENT_ID || "660835922057-ag4kgdpq4jnt7gkektt7h3suml230mbj.apps.googleusercontent.com";
+const GOOGLE_ANDROID_CLIENT_ID = process.env.GOOGLE_ANDROID_CLIENT_ID || "660835922057-mup0rn0bl5v1t17bid0caljvsa8nqspo.apps.googleusercontent.com";
+const GOOGLE_CLIENT_IDS = [GOOGLE_WEB_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID];
+
+function isAudienceValid(aud) {
+  if (!aud) return false;
+  if (Array.isArray(aud)) return aud.some((a) => GOOGLE_CLIENT_IDS.includes(a));
+  return GOOGLE_CLIENT_IDS.includes(aud);
+}
+
+app.post("/api/auth/google", async (req, res) => {
+  const { idToken } = req.body;
+  if (!idToken) {
+    return res.status(400).json({ success: false, message: "ไม่มี idToken" });
+  }
+  try {
+    const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`;
+    const resp = await fetch(url);
+    const payload = await resp.json();
+    if (payload.error) {
+      console.warn("Google tokeninfo error:", payload.error, "description:", payload.error_description);
+      return res.status(401).json({ success: false, message: "โทเคน Google ไม่ถูกต้อง" });
+    }
+    if (!isAudienceValid(payload.aud)) {
+      console.warn("Google token aud ไม่ตรง:", "aud=", payload.aud, "รอ:", GOOGLE_CLIENT_IDS);
+      return res.status(401).json({ success: false, message: "โทเคน Google ไม่ถูกต้อง" });
+    }
+    const email = payload.email;
+    const name = (payload.name || email).trim() || "User";
+    const username = name.substring(0, 50);
+
+    const findQuery = "SELECT id, username, phone FROM users WHERE email = ?";
+    db.query(findQuery, [email], (err, results) => {
+      if (err) {
+        console.error("❌ DB error:", err);
+        return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์" });
+      }
+      if (results.length > 0) {
+        const user = results[0];
+        const token = jwt.sign({ id: user.id }, SECRET_KEY, { expiresIn: "1d" });
+        return res.status(200).json({
+          success: true,
+          message: "เข้าสู่ระบบด้วย Google สำเร็จ!",
+          token,
+          username: user.username,
+          phone: user.phone,
+        });
+      }
+      const hashedPassword = bcrypt.hashSync("google-" + email + "-" + Date.now(), 8);
+      const insertQuery = "INSERT INTO users (username, phone, email, password) VALUES (?, ?, ?, ?)";
+      db.query(insertQuery, [username, "0000000000", email, hashedPassword], (err2, insertResult) => {
+        if (err2) {
+          console.error("❌ DB insert error:", err2);
+          return res.status(500).json({ success: false, message: "ไม่สามารถสร้างบัญชีได้" });
+        }
+        db.query("SELECT id, username, phone FROM users WHERE email = ?", [email], (err3, rows) => {
+          if (err3 || !rows?.length) {
+            return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดหลังสร้างบัญชี" });
+          }
+          const user = rows[0];
+          const token = jwt.sign({ id: user.id }, SECRET_KEY, { expiresIn: "1d" });
+          res.status(200).json({
+            success: true,
+            message: "สร้างบัญชีและเข้าสู่ระบบด้วย Google สำเร็จ!",
+            token,
+            username: user.username,
+            phone: user.phone || "",
+          });
+        });
+      });
+    });
+  } catch (e) {
+    console.error("Google auth error:", e);
+    res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดในการตรวจสอบ Google" });
+  }
 });
 
 // ✅ Get transactions

@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { AppContext } from "./AppContext";
 import AppLogo from "../components/AppLogo";
 
@@ -88,6 +89,52 @@ export default function LoginScreen({ navigation }) {
     } catch (error) {
       console.error("Login error:", error);
       Alert.alert("Error", "เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    try {
+      await GoogleSignin.hasPlayServices();
+      const signInResult = await GoogleSignin.signIn();
+      if (signInResult?.type !== "success" || !signInResult?.data) {
+        setLoading(false);
+        return;
+      }
+      const { idToken } = await GoogleSignin.getTokens();
+      if (!idToken) {
+        Alert.alert("❌ ล้มเหลว", "ไม่สามารถดึงข้อมูลจาก Google ได้");
+        setLoading(false);
+        return;
+      }
+      const response = await fetch(`${BASE_URL}/api/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ idToken }),
+      });
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        Alert.alert("❌ ข้อผิดพลาด", "ได้รับ response ที่ไม่ถูกต้องจากเซิร์ฟเวอร์");
+        setLoading(false);
+        return;
+      }
+      const data = await response.json();
+      if (response.ok && data.success && data.token) {
+        await AsyncStorage.setItem("token", data.token);
+        setToken(data.token);
+        if (data.username) {
+          setUsername(data.username);
+          await AsyncStorage.setItem("username", data.username);
+        }
+        Alert.alert("✅ สำเร็จ", data.message || "เข้าสู่ระบบด้วย Google เรียบร้อย!");
+      } else {
+        Alert.alert("❌ ล้มเหลว", data.message || "ไม่สามารถเข้าสู่ระบบด้วย Google ได้");
+      }
+    } catch (error) {
+      console.error("Google login error:", error);
+      Alert.alert("Error", "เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google");
     } finally {
       setLoading(false);
     }
@@ -221,6 +268,19 @@ export default function LoginScreen({ navigation }) {
                 <Ionicons name="arrow-forward" size={22} color="#fff" />
               </View>
             )}
+          </TouchableOpacity>
+
+          {/* Google Sign-In Button */}
+          <TouchableOpacity
+            style={[styles.googleButton, { opacity: loading ? 0.7 : 1 }]}
+            onPress={handleGoogleLogin}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            <View style={styles.loginButtonContent}>
+              <Ionicons name="logo-google" size={22} color="#1E293B" />
+              <Text style={styles.googleButtonText}>เข้าสู่ระบบด้วย Google</Text>
+            </View>
           </TouchableOpacity>
 
           {/* Create Account Link */}
@@ -373,6 +433,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     letterSpacing: 1,
     textTransform: "uppercase",
+  },
+  googleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 22,
+    paddingVertical: 18,
+    marginBottom: 16,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 2,
+    borderColor: "#E2E8F0",
+  },
+  googleButtonText: {
+    color: "#1E293B",
+    fontWeight: "800",
+    fontSize: 16,
+    marginLeft: 10,
   },
   registerLinkContainer: {
     alignItems: "center",

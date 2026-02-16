@@ -190,7 +190,6 @@ export const expenseCategories = [
   { name: "เครื่องสำอาง", icon: "sparkles" },
   { name: "สัตว์เลี้ยง", icon: "paw" },
   { name: "กีฬา", icon: "football" },
-  { name: "ดอกไม้", icon: "flower" },
   { name: "ของขวัญ", icon: "gift" },
   { name: "อื่น ๆ", icon: "ellipsis-horizontal-circle" },
 ];

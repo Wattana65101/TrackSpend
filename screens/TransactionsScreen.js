@@ -4,13 +4,12 @@ import {
   Text,
   View,
   FlatList,
-  SafeAreaView,
   TouchableOpacity,
   Modal,
 } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppContext, expenseCategories, incomeCategories } from "./AppContext";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TransactionsScreen() {
   const { transactions, deleteTransaction, colors, hexToRgbA } = useContext(AppContext);
@@ -138,9 +137,10 @@ export default function TransactionsScreen() {
         <FlatList
           data={transactions}
           keyExtractor={(item, index) =>
-            item && item.id ? String(item.id) : `txn-${index}`
+            item && item.id != null ? String(item.id) : `txn-${index}`
           }
           renderItem={renderItem}
+          extraData={{ transactions, colors }}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         />
