@@ -428,8 +428,8 @@ export default function HomeScreen() {
                 กดค้างบนกราฟเพื่อดูรายละเอียด
               </Text>
             </View>
-            {/* Summary Stats */}
-            <View style={[styles.chartSummary, { backgroundColor: hexToRgbA(colors?.subtext, 0.05) }]}>
+            {/* Summary Stats - พื้นหลังขาวเทาอ่อนทุกธีม */}
+            <View style={[styles.chartSummary, { backgroundColor: "#f0f0f0" }]}>
               <View style={styles.chartSummaryItem}>
                 <View style={[styles.chartSummaryDot, { backgroundColor: colors?.income }]} />
                 <View style={styles.chartSummaryContent}>
@@ -523,18 +523,18 @@ export default function HomeScreen() {
                     style={[
                       styles.chartTooltipBox,
                       {
-                        backgroundColor: hexToRgbA(colors?.text ?? "#111", 0.92),
+                        backgroundColor: "#f0f0f0",
                         left: Math.max(4, Math.min(chartWidth - 110, chartTooltip.x - 55)),
                         top: Math.max(4, chartTooltip.y - 62),
                       },
                     ]}
                     pointerEvents="none"
                   >
-                    <Text style={[styles.chartTooltipLabel, { color: colors?.card ?? "#fff" }]}>
+                    <Text style={[styles.chartTooltipLabel, { color: "#333" }]}>
                       {chartTooltip.label}
                     </Text>
                     {chartTooltip.dateLabel ? (
-                      <Text style={[styles.chartTooltipDate, { color: hexToRgbA(colors?.card ?? "#fff", 0.85) }]}>
+                      <Text style={[styles.chartTooltipDate, { color: "#666" }]}>
                         {chartTooltip.dateLabel}
                       </Text>
                     ) : null}
