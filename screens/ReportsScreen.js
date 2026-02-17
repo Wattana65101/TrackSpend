@@ -115,7 +115,7 @@ function getApexStackedAreaHtml(months, incomeData, expenseData, width, height, 
           type: 'area',
           height: ${height},
           width: ${width},
-          stacked: true,
+          stacked: false,
           toolbar: { show: false },
           zoom: { enabled: false }
         },

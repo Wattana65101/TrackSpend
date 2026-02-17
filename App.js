@@ -39,6 +39,12 @@ function MainApp() {
     }
   }, [token, transactions]);
 
+  useEffect(() => {
+    if (!token) return;
+    const t = setTimeout(() => setIsLoadingData(false), 8000);
+    return () => clearTimeout(t);
+  }, [token]);
+
   // ถ้ากำลังโหลด onboarding status หรือกำลัง fetch data ให้แสดง loading
   if (hasSeenOnboarding === null || (token && isLoadingData)) {
     return (

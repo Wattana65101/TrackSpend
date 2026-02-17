@@ -269,12 +269,12 @@ export function AppProvider({ children }) {
           setHasCheckedNewUser(true);
         }
       } else {
-        // ถ้าเป็น 401 หรือ 403 แสดงว่า token หมดอายุหรือไม่ถูกต้อง
         if (transactionsResponse.status === 401 || transactionsResponse.status === 403) {
           await clearTokenAndLogout();
           return;
         }
         console.error("❌ Failed to fetch transactions:", transactionsResponse.status, transactionsText);
+        setTransactions([]);
       }
 
       // --- Budgets ---
@@ -295,6 +295,7 @@ export function AppProvider({ children }) {
       }
     } catch (error) {
       console.error("🔥 Error fetching data:", error);
+      setTransactions([]);
     }
   }, [token, clearTokenAndLogout, setHasSeenOnboarding, setIsNewUser, hasCheckedNewUser]);
 
@@ -386,9 +387,7 @@ export function AppProvider({ children }) {
 
         // โหลด onboarding status
         const hasSeen = await AsyncStorage.getItem("hasSeenOnboarding");
-        const hasSeenValue = hasSeen === "true";
-        console.log("🔍 Loading onboarding status:", { hasSeen, hasSeenValue });
-        setHasSeenOnboarding(hasSeenValue);
+        setHasSeenOnboarding(hasSeen === "true");
       } catch (error) {
         console.error("Failed to load data", error);
         setHasSeenOnboarding(false); // ถ้า error ให้แสดง onboarding

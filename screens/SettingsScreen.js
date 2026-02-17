@@ -8,6 +8,7 @@ import {
   Alert,
   ScrollView,
 } from "react-native";
+import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { AppContext } from "./AppContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -32,7 +33,11 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = async () => {
+    try {
+      await GoogleSignin.signOut(); // ล้าง session Google เพื่อให้ login ใหม่ได้ idToken ใหม่
+    } catch (_) {}
     await AsyncStorage.removeItem("token");
+    await AsyncStorage.removeItem("username");
     setToken(null); // ✅ กลับไป LoginScreen
     Alert.alert("ออกจากระบบแล้ว");
   };

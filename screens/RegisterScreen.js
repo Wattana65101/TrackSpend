@@ -11,6 +11,7 @@ import {
   Platform,
   ScrollView,
   Dimensions,
+  Modal,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -21,7 +22,7 @@ import AppLogo from "../components/AppLogo";
 const { width } = Dimensions.get("window");
 
 export default function RegisterScreen({ navigation }) {
-  const { colors, BASE_URL, hexToRgbA, setToken, setUsername } = useContext(AppContext);
+  const { colors, BASE_URL, hexToRgbA, setToken, setUsername, setIsNewUser, setHasSeenOnboarding } = useContext(AppContext);
   const [usernameInput, setUsernameInput] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -31,6 +32,9 @@ export default function RegisterScreen({ navigation }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
+  const [googlePending, setGooglePending] = useState(null);
+  const [googleFormUsername, setGoogleFormUsername] = useState("");
+  const [googleFormPhone, setGoogleFormPhone] = useState("");
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -204,6 +208,7 @@ export default function RegisterScreen({ navigation }) {
   const handleGoogleRegister = async () => {
     setLoading(true);
     try {
+      try { await GoogleSignin.signOut(); } catch (_) {}
       await GoogleSignin.hasPlayServices();
       const signInResult = await GoogleSignin.signIn();
       if (signInResult?.type !== "success" || !signInResult?.data) {
@@ -235,15 +240,69 @@ export default function RegisterScreen({ navigation }) {
           setUsername(data.username);
           await AsyncStorage.setItem("username", data.username);
         }
+        if (data.isNewUser === true) {
+          setIsNewUser(true);
+          setHasSeenOnboarding(false);
+          await AsyncStorage.setItem("hasSeenOnboarding", "false");
+        }
         Alert.alert("✅ สำเร็จ", data.message || "สมัคร/เข้าสู่ระบบด้วย Google เรียบร้อย!", [
           { text: "ตกลง" },
         ]);
+      } else if (data.needMoreInfo && data.email && data.name) {
+        setGooglePending({ idToken, email: data.email, name: data.name });
+        setGoogleFormUsername(data.name);
+        setGoogleFormPhone("");
       } else {
         Alert.alert("❌ ล้มเหลว", data.message || "ไม่สามารถสมัครด้วย Google ได้");
       }
     } catch (error) {
       console.error("Google register error:", error);
       Alert.alert("Error", "เกิดข้อผิดพลาดในการสมัครด้วย Google");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCompleteGoogleRegister = async () => {
+    const phoneDigits = (googleFormPhone || "").replace(/\D/g, "");
+    if (phoneDigits.length !== 10) {
+      Alert.alert("❌ ล้มเหลว", "กรุณากรอกเบอร์โทรศัพท์ 10 ตัวเลข");
+      return;
+    }
+    if (!googlePending) return;
+    setLoading(true);
+    try {
+      const response = await fetch(`${BASE_URL}/api/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idToken: googlePending.idToken,
+          phone: phoneDigits,
+          username: (googleFormUsername || "").trim() || googlePending.name,
+        }),
+      });
+      const data = await response.json();
+      if (response.ok && data.success && data.token) {
+        setGooglePending(null);
+        await AsyncStorage.setItem("token", data.token);
+        setToken(data.token);
+        if (data.username) {
+          setUsername(data.username);
+          await AsyncStorage.setItem("username", data.username);
+        }
+        if (data.isNewUser === true) {
+          setIsNewUser(true);
+          setHasSeenOnboarding(false);
+          await AsyncStorage.setItem("hasSeenOnboarding", "false");
+        }
+        Alert.alert("✅ สำเร็จ", data.message || "สมัครสมาชิกเรียบร้อยแล้ว!", [
+          { text: "ตกลง" },
+        ]);
+      } else {
+        Alert.alert("❌ ล้มเหลว", data.message || "ไม่สามารถสมัครได้");
+      }
+    } catch (error) {
+      Alert.alert("Error", "เกิดข้อผิดพลาดในการสมัคร");
     } finally {
       setLoading(false);
     }
@@ -717,6 +776,64 @@ export default function RegisterScreen({ navigation }) {
           </View>
         </Animated.View>
       </ScrollView>
+
+      {/* Modal กรอกข้อมูลเพิ่มเติมหลัง Google Sign-In (สมัครใหม่) */}
+      <Modal
+        visible={!!googlePending}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setGooglePending(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>กรอกข้อมูลเพิ่มเติม</Text>
+            <Text style={[styles.modalSubtitle, { color: colors.subtext }]}>
+              เข้าสู่ระบบด้วย Google แล้ว กรุณากรอกข้อมูลเพื่อสมัครสมาชิก
+            </Text>
+            {googlePending && (
+              <View style={styles.modalField}>
+                <Text style={[styles.modalLabel, { color: colors.subtext }]}>อีเมล</Text>
+                <Text style={[styles.modalValue, { color: colors.text }]}>{googlePending.email}</Text>
+              </View>
+            )}
+            <View style={styles.modalField}>
+              <Text style={[styles.modalLabel, { color: colors.subtext }]}>ชื่อผู้ใช้</Text>
+              <TextInput
+                style={[styles.modalInput, { color: colors.text, borderColor: colors.subtext }]}
+                placeholder="ชื่อผู้ใช้"
+                placeholderTextColor={colors.subtext}
+                value={googleFormUsername}
+                onChangeText={setGoogleFormUsername}
+              />
+            </View>
+            <View style={styles.modalField}>
+              <Text style={[styles.modalLabel, { color: colors.subtext }]}>เบอร์โทรศัพท์ (บังคับ)</Text>
+              <TextInput
+                style={[styles.modalInput, { color: colors.text, borderColor: colors.subtext }]}
+                placeholder="0XXXXXXXXX"
+                placeholderTextColor={colors.subtext}
+                value={googleFormPhone}
+                onChangeText={(t) => { const d = t.replace(/\D/g, ""); if (d.length <= 10) setGoogleFormPhone(d); }}
+                keyboardType="phone-pad"
+                maxLength={10}
+              />
+            </View>
+            <TouchableOpacity
+              style={[styles.modalButton, { backgroundColor: colors.primary }]}
+              onPress={handleCompleteGoogleRegister}
+              disabled={loading}
+            >
+              <Text style={styles.modalButtonText}>สมัครสมาชิก</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalCancel}
+              onPress={() => setGooglePending(null)}
+            >
+              <Text style={[styles.modalCancelText, { color: colors.subtext }]}>ยกเลิก</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -989,5 +1106,61 @@ const styles = StyleSheet.create({
   linkTextBold: {
     fontSize: 14,
     fontWeight: "bold",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalContent: {
+    borderRadius: 20,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  modalField: {
+    marginBottom: 16,
+  },
+  modalLabel: {
+    fontSize: 12,
+    marginBottom: 6,
+    fontWeight: "600",
+  },
+  modalValue: {
+    fontSize: 14,
+  },
+  modalInput: {
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+  },
+  modalButton: {
+    borderRadius: 14,
+    paddingVertical: 16,
+    marginTop: 8,
+    alignItems: "center",
+  },
+  modalButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  modalCancel: {
+    marginTop: 12,
+    alignItems: "center",
+  },
+  modalCancelText: {
+    fontSize: 14,
   },
 });

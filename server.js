@@ -175,7 +175,7 @@ function isAudienceValid(aud) {
 }
 
 app.post("/api/auth/google", async (req, res) => {
-  const { idToken } = req.body;
+  const { idToken, phone, username: reqUsername } = req.body;
   if (!idToken) {
     return res.status(400).json({ success: false, message: "ไม่มี idToken" });
   }
@@ -193,7 +193,6 @@ app.post("/api/auth/google", async (req, res) => {
     }
     const email = payload.email;
     const name = (payload.name || email).trim() || "User";
-    const username = name.substring(0, 50);
 
     const findQuery = "SELECT id, username, phone FROM users WHERE email = ?";
     db.query(findQuery, [email], (err, results) => {
@@ -206,15 +205,27 @@ app.post("/api/auth/google", async (req, res) => {
         const token = jwt.sign({ id: user.id }, SECRET_KEY, { expiresIn: "1d" });
         return res.status(200).json({
           success: true,
+          isNewUser: false,
           message: "เข้าสู่ระบบด้วย Google สำเร็จ!",
           token,
           username: user.username,
           phone: user.phone,
         });
       }
+      const phoneDigits = (phone || "").toString().replace(/\D/g, "");
+      if (phoneDigits.length !== 10) {
+        return res.status(200).json({
+          success: false,
+          needMoreInfo: true,
+          email,
+          name: name.substring(0, 50),
+          message: "กรุณากรอกเบอร์โทรศัพท์ 10 ตัวเลขเพื่อสมัครสมาชิก",
+        });
+      }
+      const username = (reqUsername && String(reqUsername).trim()) ? String(reqUsername).trim().substring(0, 50) : name.substring(0, 50);
       const hashedPassword = bcrypt.hashSync("google-" + email + "-" + Date.now(), 8);
       const insertQuery = "INSERT INTO users (username, phone, email, password) VALUES (?, ?, ?, ?)";
-      db.query(insertQuery, [username, "0000000000", email, hashedPassword], (err2, insertResult) => {
+      db.query(insertQuery, [username, phoneDigits, email, hashedPassword], (err2, insertResult) => {
         if (err2) {
           console.error("❌ DB insert error:", err2);
           return res.status(500).json({ success: false, message: "ไม่สามารถสร้างบัญชีได้" });
@@ -227,6 +238,7 @@ app.post("/api/auth/google", async (req, res) => {
           const token = jwt.sign({ id: user.id }, SECRET_KEY, { expiresIn: "1d" });
           res.status(200).json({
             success: true,
+            isNewUser: true,
             message: "สร้างบัญชีและเข้าสู่ระบบด้วย Google สำเร็จ!",
             token,
             username: user.username,
