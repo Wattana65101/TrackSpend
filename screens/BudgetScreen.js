@@ -79,7 +79,7 @@ const BudgetCard = ({ budget, spent, colors, hexToRgbA, onEdit, onDelete }) => {
               {budget.category}
             </Text>
             <Text style={[styles.budgetLimit, { color: colors.subtext }]}>
-              งบประมาณ: ฿{budget.limit.toLocaleString()}
+              เป้าหมายการจ่ายใช้: ฿{budget.limit.toLocaleString()}
             </Text>
           </View>
         </View>
@@ -316,7 +316,7 @@ export default function BudgetScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: colors.text }]}>งบประมาณ</Text>
+          <Text style={[styles.title, { color: colors.text }]}>เป้าหมายการจ่ายใช้</Text>
           <Text style={[styles.subtitle, { color: colors.subtext }]}>
             {budgets.length} งบประมาณ
           </Text>
@@ -335,7 +335,10 @@ export default function BudgetScreen() {
           data={budgetsWithSpent}
           keyExtractor={(item) => item.id.toString()}
           renderItem={renderBudget}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: (insets.bottom || 0) + 100 },
+          ]}
           showsVerticalScrollIndicator={false}
         />
       ) : (

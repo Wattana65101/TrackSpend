@@ -2,7 +2,8 @@ import React, { createContext, useState, useMemo, useEffect, useCallback } from 
 import { useColorScheme, Alert } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const BASE_URL = "http://10.0.2.2:500"; 
+import { BASE_URL as API_BASE } from "../config/api";
+export const BASE_URL = API_BASE; 
 
 //  THEME & COLORS
 const hexToRgbA = (hex, alpha) => {
@@ -47,7 +48,7 @@ const themes = {
     buttonIncome: "#10B981", // emerald-500
     buttonExpense: "#EF4444", // red-500
     budgetIcon: "#059669", // emerald-600
-    chartIncome: "#10B981", 
+    chartIncome: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
     chartExpense: "#EF4444", 
   },
   // ธีม: Ocean Blue - ปรับความเข้มให้หลากหลาย
@@ -63,16 +64,16 @@ const themes = {
     textMedium: "#075985", // sky-800
     subtext: "#64748B", // slate-500
     subtextLight: "#94A3B8", // slate-400
-    income: "#06B6D4", // cyan-500
-    incomeLight: "#22D3EE", // cyan-400
-    incomeDark: "#0891B2", // cyan-600
+    income: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
+    incomeLight: "#34D399",
+    incomeDark: "#059669",
     expense: "#F43F5E", // rose-500
     expenseLight: "#FB7185", // rose-400
     expenseDark: "#E11D48", // rose-600
-    buttonIncome: "#06B6D4",
+    buttonIncome: "#10B981",
     buttonExpense: "#F43F5E",
     budgetIcon: "#0EA5E9",
-    chartIncome: "#06B6D4", 
+    chartIncome: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
     chartExpense: "#F43F5E", 
   },
   // ธีม: Purple Dream - ปรับความเข้มให้หลากหลาย
@@ -88,16 +89,16 @@ const themes = {
     textMedium: "#5B21B6", // violet-800
     subtext: "#6B7280", // gray-500
     subtextLight: "#9CA3AF", // gray-400
-    income: "#A78BFA", // violet-400
-    incomeLight: "#C4B5FD", // violet-300
-    incomeDark: "#8B5CF6", // violet-500
+    income: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
+    incomeLight: "#34D399",
+    incomeDark: "#059669",
     expense: "#F87171", // red-400
     expenseLight: "#FCA5A5", // red-300
     expenseDark: "#EF4444", // red-500
-    buttonIncome: "#A78BFA",
+    buttonIncome: "#10B981",
     buttonExpense: "#F87171",
     budgetIcon: "#8B5CF6",
-    chartIncome: "#A78BFA", 
+    chartIncome: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
     chartExpense: "#F87171", 
   },
   // ธีม: Sunset Orange - ปรับความเข้มให้หลากหลาย
@@ -113,16 +114,16 @@ const themes = {
     textMedium: "#9A3412", // orange-800
     subtext: "#6B7280", // gray-500
     subtextLight: "#9CA3AF", // gray-400
-    income: "#FB923C", // orange-400
-    incomeLight: "#FDBA74", // orange-300
-    incomeDark: "#F97316", // orange-500
+    income: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
+    incomeLight: "#34D399",
+    incomeDark: "#059669",
     expense: "#DC2626", // red-600
     expenseLight: "#EF4444", // red-500
     expenseDark: "#B91C1C", // red-700
-    buttonIncome: "#FB923C",
+    buttonIncome: "#10B981",
     buttonExpense: "#DC2626",
     budgetIcon: "#F97316",
-    chartIncome: "#FB923C", 
+    chartIncome: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
     chartExpense: "#DC2626", 
   },
   // ธีม: Forest Green - ปรับความเข้มให้หลากหลาย
@@ -138,16 +139,16 @@ const themes = {
     textMedium: "#166534", // green-800
     subtext: "#6B7280", // gray-500
     subtextLight: "#9CA3AF", // gray-400
-    income: "#22C55E", // green-500
-    incomeLight: "#4ADE80", // green-400
-    incomeDark: "#16A34A", // green-600
+    income: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
+    incomeLight: "#34D399",
+    incomeDark: "#059669",
     expense: "#EF4444", // red-500
     expenseLight: "#F87171", // red-400
     expenseDark: "#DC2626", // red-600
-    buttonIncome: "#22C55E",
+    buttonIncome: "#10B981",
     buttonExpense: "#EF4444",
     budgetIcon: "#16A34A",
-    chartIncome: "#22C55E", 
+    chartIncome: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
     chartExpense: "#EF4444", 
   },
   // ธีม: Dark Mode - ปรับความเข้มให้หลากหลาย
@@ -163,16 +164,16 @@ const themes = {
     textMedium: "#E5E7EB", // gray-200
     subtext: "#9CA3AF", // gray-400
     subtextLight: "#6B7280", // gray-500
-    income: "#34D399", // emerald-400
-    incomeLight: "#6EE7B7", // emerald-300
-    incomeDark: "#10B981", // emerald-500
+    income: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
+    incomeLight: "#34D399",
+    incomeDark: "#059669",
     expense: "#F87171", // red-400
     expenseLight: "#FCA5A5", // red-300
     expenseDark: "#EF4444", // red-500
-    buttonIncome: "#34D399",
+    buttonIncome: "#10B981",
     buttonExpense: "#F87171",
     budgetIcon: "#10B981",
-    chartIncome: "#34D399", 
+    chartIncome: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
     chartExpense: "#F87171", 
   },
 };

@@ -6,7 +6,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
-  Pressable,
+  Platform,
+  PanResponder,
 } from "react-native";
 import { AppContext, expenseCategories, incomeCategories } from "./AppContext";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -23,7 +24,12 @@ export default function HomeScreen() {
   const screenWidth = Dimensions.get("window").width;
   const [timeRange, setTimeRange] = useState("month"); // "week" or "month"
   const [chartTooltip, setChartTooltip] = useState(null); // { label, income, expense, x, y, dateLabel } or null
+  const CHART_PADDING_LEFT = 45;  // พื้นที่ Y-axis labels
   const CHART_PADDING_RIGHT = 64;
+
+  // สีเส้นกราฟ: รายรับ = เขียว, รายจ่าย = แดง (ตามธีม)
+  const chartIncomeLineColor = colors?.chartIncome || colors?.income;
+  const chartExpenseLineColor = colors?.chartExpense || colors?.expense;
 
   // ✅ datasets สรุปรายสัปดาห์ (7 วัน)
   const weeklyData = useMemo(() => {
@@ -31,8 +37,8 @@ export default function HomeScreen() {
       return {
         labels: [],
         datasets: [
-          { data: [], color: () => colors?.income },
-          { data: [], color: () => colors?.expense },
+          { data: [], color: () => chartIncomeLineColor },
+          { data: [], color: () => chartExpenseLineColor },
         ],
       };
     }
@@ -57,8 +63,8 @@ export default function HomeScreen() {
     return {
       labels: days,
       datasets: [
-        { data: incomeTotals, color: () => colors?.income },
-        { data: expenseTotals, color: () => colors?.expense },
+        { data: incomeTotals, color: () => chartIncomeLineColor },
+        { data: expenseTotals, color: () => chartExpenseLineColor },
       ],
     };
   }, [transactions, colors]);
@@ -69,8 +75,8 @@ export default function HomeScreen() {
       return {
         labels: [],
         datasets: [
-          { data: [], color: () => colors?.income },
-          { data: [], color: () => colors?.expense },
+          { data: [], color: () => chartIncomeLineColor },
+          { data: [], color: () => chartExpenseLineColor },
         ],
       };
     }
@@ -115,8 +121,8 @@ export default function HomeScreen() {
     return {
       labels: labels,
       datasets: [
-        { data: incomeTotals, color: () => colors?.income },
-        { data: expenseTotals, color: () => colors?.expense },
+        { data: incomeTotals, color: () => chartIncomeLineColor },
+        { data: expenseTotals, color: () => chartExpenseLineColor },
       ],
     };
   }, [transactions, colors]);
@@ -130,8 +136,12 @@ export default function HomeScreen() {
   const showTooltipAtChartPosition = useCallback(
     (chartX, chartY) => {
       if (!chartData.labels.length) return;
-      const dataWidth = chartWidth - CHART_PADDING_RIGHT;
-      const rawIndex = (chartX / dataWidth) * (chartData.labels.length - 1);
+      const dataStartX = CHART_PADDING_LEFT;
+      const dataEndX = chartWidth - CHART_PADDING_RIGHT;
+      const dataWidth = dataEndX - dataStartX;
+      if (dataWidth <= 0) return;
+      const clampedX = Math.max(dataStartX, Math.min(dataEndX, chartX));
+      const rawIndex = ((clampedX - dataStartX) / dataWidth) * (chartData.labels.length - 1);
       const index = Math.max(0, Math.min(chartData.labels.length - 1, Math.round(rawIndex)));
       const label = chartData.labels[index];
       const income = chartData.datasets[0]?.data[index] ?? 0;
@@ -162,17 +172,24 @@ export default function HomeScreen() {
     [chartData, chartWidth, timeRange]
   );
 
-  const handleChartPressIn = useCallback(
-    (evt) => {
-      const { locationX, locationY } = evt.nativeEvent;
-      showTooltipAtChartPosition(locationX, locationY);
-    },
+  const chartPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt) => {
+          const { locationX, locationY } = evt.nativeEvent;
+          showTooltipAtChartPosition(locationX, locationY);
+        },
+        onPanResponderMove: (evt) => {
+          const { locationX, locationY } = evt.nativeEvent;
+          showTooltipAtChartPosition(locationX, locationY);
+        },
+        onPanResponderRelease: () => setChartTooltip(null),
+        onPanResponderTerminate: () => setChartTooltip(null),
+      }),
     [showTooltipAtChartPosition]
   );
-
-  const handleChartPressOut = useCallback(() => {
-    setChartTooltip(null);
-  }, []);
 
   const recentTransactionsWithIcons = useMemo(() => {
     if (!transactions) return [];
@@ -211,7 +228,7 @@ export default function HomeScreen() {
       style={[styles.container, { backgroundColor: colors?.background }]}
       contentContainerStyle={{ 
         paddingTop: insets.top + 10,
-        paddingBottom: insets.bottom + 80, // เพิ่ม padding ด้านล่างเพื่อไม่ให้ถูกบังโดย tab bar
+        paddingBottom: (insets.bottom || 0) + 100, // เพิ่ม padding เพื่อเลื่อนลงล่างสุดได้และไม่ถูกบัง tab bar
       }}
       showsVerticalScrollIndicator={false}
     >
@@ -255,7 +272,7 @@ export default function HomeScreen() {
             <Ionicons name="arrow-down-circle" size={20} color="#FFFFFF" style={{ opacity: 0.9 }} />
             <View style={styles.statContent}>
               <Text style={styles.statLabel}>รายรับเดือนนี้</Text>
-              <Text style={styles.statValue}>
+              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
                 ฿{monthlyStats.income.toLocaleString(undefined, {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
@@ -268,7 +285,7 @@ export default function HomeScreen() {
             <Ionicons name="arrow-up-circle" size={20} color="#FFFFFF" style={{ opacity: 0.9 }} />
             <View style={styles.statContent}>
               <Text style={styles.statLabel}>รายจ่ายเดือนนี้</Text>
-              <Text style={styles.statValue}>
+              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
                 ฿{monthlyStats.expense.toLocaleString(undefined, {
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
@@ -310,16 +327,18 @@ export default function HomeScreen() {
           borderColor: hexToRgbA(colors?.income, 0.3),
         }]}>
           <View style={[styles.quickStatIcon, { backgroundColor: hexToRgbA(colors?.income, 0.2) }]}>
-            <Ionicons name="trending-up" size={24} color={colors?.income} />
+            <Ionicons name="trending-up" size={20} color={colors?.income} />
           </View>
           <View style={styles.quickStatContent}>
-            <Text style={[styles.quickStatLabel, { color: colors?.subtext }]}>รายรับรวม</Text>
-            <Text style={[styles.quickStatValue, { color: colors?.income }]}>
+            <Text style={[styles.quickStatLabel, { color: colors?.subtext }]} {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>รายรับรวม</Text>
+            <View style={{ flexShrink: 0, minWidth: 0 }}>
+              <Text style={[styles.quickStatValue, { color: colors?.income }]} numberOfLines={1} adjustsFontSizeToFit {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>
               ฿{transactions
                 ?.filter((t) => t.type === "income")
                 .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0)
                 .toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || "0"}
-            </Text>
+              </Text>
+            </View>
           </View>
         </View>
         <View style={[styles.quickStatCard, { 
@@ -327,16 +346,18 @@ export default function HomeScreen() {
           borderColor: hexToRgbA(colors?.expense, 0.3),
         }]}>
           <View style={[styles.quickStatIcon, { backgroundColor: hexToRgbA(colors?.expense, 0.2) }]}>
-            <Ionicons name="trending-down" size={24} color={colors?.expense} />
+            <Ionicons name="trending-down" size={20} color={colors?.expense} />
           </View>
           <View style={styles.quickStatContent}>
-            <Text style={[styles.quickStatLabel, { color: colors?.subtext }]}>รายจ่ายรวม</Text>
-            <Text style={[styles.quickStatValue, { color: colors?.expense }]}>
+            <Text style={[styles.quickStatLabel, { color: colors?.subtext }]} {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>รายจ่ายรวม</Text>
+            <View style={{ flexShrink: 0, minWidth: 0 }}>
+              <Text style={[styles.quickStatValue, { color: colors?.expense }]} numberOfLines={1} adjustsFontSizeToFit {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>
               ฿{transactions
                 ?.filter((t) => t.type === "expense")
                 .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0)
                 .toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || "0"}
-            </Text>
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -349,13 +370,13 @@ export default function HomeScreen() {
         <View style={styles.cardHeader}>
           <View style={styles.cardHeaderLeft}>
             <View style={[styles.cardIcon, { backgroundColor: hexToRgbA(colors?.primary, 0.1) }]}>
-              <Ionicons name="stats-chart" size={20} color={colors?.primary} />
+              <Ionicons name="stats-chart" size={18} color={colors?.primary} />
             </View>
-            <View>
-              <Text style={[styles.cardTitle, { color: colors?.text }]}>
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors?.text }]} numberOfLines={1}>
                 กราฟสรุป{timeRange === "month" ? "รายเดือน" : "รายสัปดาห์"}
               </Text>
-              <Text style={[styles.cardSubtitle, { color: colors?.subtext }]}>
+              <Text style={[styles.cardSubtitle, { color: colors?.subtext }]} numberOfLines={1}>
                 {timeRange === "month" ? "12 เดือนล่าสุด" : "7 วัน"}
               </Text>
             </View>
@@ -417,35 +438,39 @@ export default function HomeScreen() {
           <>
             <View style={styles.chartLegend}>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: colors?.income }]} />
-                <Text style={[styles.legendText, { color: colors?.subtext }]}>รายรับ</Text>
+                <View style={[styles.legendDot, { backgroundColor: chartIncomeLineColor }]} />
+                <Text style={[styles.legendText, { color: colors?.subtext }]} numberOfLines={1}>รายรับ</Text>
               </View>
               <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: colors?.expense }]} />
-                <Text style={[styles.legendText, { color: colors?.subtext }]}>รายจ่าย</Text>
+                <View style={[styles.legendDot, { backgroundColor: chartExpenseLineColor }]} />
+                <Text style={[styles.legendText, { color: colors?.subtext }]} numberOfLines={1}>รายจ่าย</Text>
               </View>
-              <Text style={[styles.legendHint, { color: colors?.subtext }]}>
+              <Text style={[styles.legendHint, { color: colors?.subtext }]} numberOfLines={1}>
                 กดค้างบนกราฟเพื่อดูรายละเอียด
               </Text>
             </View>
             {/* Summary Stats - พื้นหลังขาวเทาอ่อนทุกธีม */}
-            <View style={[styles.chartSummary, { backgroundColor: "#f0f0f0" }]}>
+            <View style={styles.chartSummary}>
               <View style={styles.chartSummaryItem}>
-                <View style={[styles.chartSummaryDot, { backgroundColor: colors?.income }]} />
-                <View style={styles.chartSummaryContent}>
-                  <Text style={[styles.chartSummaryLabel, { color: colors?.subtext }]}>รายรับรวม</Text>
-                  <Text style={[styles.chartSummaryValue, { color: colors?.income }]}>
-                    ฿{chartData.datasets[0]?.data.reduce((a, b) => a + b, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || "0"}
-                  </Text>
+                <View style={[styles.chartSummaryDot, { backgroundColor: chartIncomeLineColor }]} />
+                  <View style={styles.chartSummaryContent}>
+                  <Text style={[styles.chartSummaryLabel, { color: colors?.subtext }]} numberOfLines={1} {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>รายรับรวม</Text>
+                  <View style={{ flexShrink: 0, minWidth: 0 }}>
+                    <Text style={[styles.chartSummaryValue, { color: chartIncomeLineColor }]} numberOfLines={1} adjustsFontSizeToFit {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>
+                      ฿{chartData.datasets[0]?.data.reduce((a, b) => a + b, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || "0"}
+                    </Text>
+                  </View>
                 </View>
               </View>
               <View style={styles.chartSummaryItem}>
-                <View style={[styles.chartSummaryDot, { backgroundColor: colors?.expense }]} />
-                <View style={styles.chartSummaryContent}>
-                  <Text style={[styles.chartSummaryLabel, { color: colors?.subtext }]}>รายจ่ายรวม</Text>
-                  <Text style={[styles.chartSummaryValue, { color: colors?.expense }]}>
-                    ฿{chartData.datasets[1]?.data.reduce((a, b) => a + b, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || "0"}
-                  </Text>
+                <View style={[styles.chartSummaryDot, { backgroundColor: chartExpenseLineColor }]} />
+                  <View style={styles.chartSummaryContent}>
+                  <Text style={[styles.chartSummaryLabel, { color: colors?.subtext }]} numberOfLines={1} {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>รายจ่ายรวม</Text>
+                  <View style={{ flexShrink: 0, minWidth: 0 }}>
+                    <Text style={[styles.chartSummaryValue, { color: chartExpenseLineColor }]} numberOfLines={1} adjustsFontSizeToFit {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>
+                      ฿{chartData.datasets[1]?.data.reduce((a, b) => a + b, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || "0"}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
@@ -466,12 +491,12 @@ export default function HomeScreen() {
                         datasets: [
                           {
                             data: chartData.datasets[0]?.data || [],
-                            color: (opacity = 1) => hexToRgbA(colors?.income || "#10B981", opacity),
+                            color: (opacity = 1) => hexToRgbA(chartIncomeLineColor, opacity),
                             strokeWidth: 2,
                           },
                           {
                             data: chartData.datasets[1]?.data || [],
-                            color: (opacity = 1) => hexToRgbA(colors?.expense || "#EF4444", opacity),
+                            color: (opacity = 1) => hexToRgbA(chartExpenseLineColor, opacity),
                             strokeWidth: 2,
                           },
                         ],
@@ -483,7 +508,7 @@ export default function HomeScreen() {
                         backgroundGradientFrom: colors?.card,
                         backgroundGradientTo: colors?.card,
                         decimalPlaces: 0,
-                        color: (opacity = 1) => colors?.income || "#10B981",
+                        color: (opacity = 1) => chartIncomeLineColor,
                         labelColor: (opacity = 1) => colors?.subtext,
                         useShadowColorFromDataset: true,
                         propsForBackgroundLines: {
@@ -512,24 +537,32 @@ export default function HomeScreen() {
                       }}
                     />
                 </View>
-                <Pressable
-                  style={StyleSheet.absoluteFill}
-                  onPressIn={handleChartPressIn}
-                  onPressOut={handleChartPressOut}
-                  onPressCancel={handleChartPressOut}
-                />
+                <View style={StyleSheet.absoluteFill} {...chartPanResponder.panHandlers} />
                 {chartTooltip && (
-                  <View
-                    style={[
-                      styles.chartTooltipBox,
-                      {
-                        backgroundColor: "#f0f0f0",
-                        left: Math.max(4, Math.min(chartWidth - 110, chartTooltip.x - 55)),
-                        top: Math.max(4, chartTooltip.y - 62),
-                      },
-                    ]}
-                    pointerEvents="none"
-                  >
+                  <>
+                    <View
+                      style={[
+                        styles.chartTooltipDot,
+                        {
+                          left: chartTooltip.x - 6,
+                          top: chartTooltip.y - 6,
+                          backgroundColor: colors?.primary,
+                        },
+                      ]}
+                      pointerEvents="none"
+                    />
+                    <View
+                      style={[
+                        styles.chartTooltipBox,
+                        {
+                          backgroundColor: colors?.card || "#f0f0f0",
+                          borderColor: hexToRgbA(colors?.subtext, 0.2),
+                          left: Math.max(4, Math.min(chartWidth - 110, chartTooltip.x - 55)),
+                          top: Math.max(4, chartTooltip.y - 62),
+                        },
+                      ]}
+                      pointerEvents="none"
+                    >
                     <Text style={[styles.chartTooltipLabel, { color: "#333" }]}>
                       {chartTooltip.label}
                     </Text>
@@ -538,13 +571,14 @@ export default function HomeScreen() {
                         {chartTooltip.dateLabel}
                       </Text>
                     ) : null}
-                    <Text style={[styles.chartTooltipIncome, { color: colors?.income || "#10B981" }]}>
+                    <Text style={[styles.chartTooltipIncome, { color: chartIncomeLineColor }]}>
                       รายรับ ฿{Number(chartTooltip.income).toLocaleString("th-TH", { maximumFractionDigits: 0 })}
                     </Text>
-                    <Text style={[styles.chartTooltipExpense, { color: colors?.expense || "#EF4444" }]}>
+                    <Text style={[styles.chartTooltipExpense, { color: chartExpenseLineColor }]}>
                       รายจ่าย ฿{Number(chartTooltip.expense).toLocaleString("th-TH", { maximumFractionDigits: 0 })}
                     </Text>
                   </View>
+                  </>
                 )}
               </View>
             </ScrollView>
@@ -635,12 +669,14 @@ export default function HomeScreen() {
                   <View style={styles.transactionDetails}>
                     <Text
                       style={[styles.transactionCategory, { color: colors?.text }]}
+                      {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}
                     >
                       {t.category}
                     </Text>
                     <View style={styles.transactionMeta}>
                       <Text
                         style={[styles.transactionDate, { color: colors?.subtext }]}
+                        {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}
                       >
                         {t.date ? new Date(t.date).toLocaleDateString("th-TH", {
                           day: "numeric",
@@ -653,6 +689,7 @@ export default function HomeScreen() {
                           <Text
                             style={[styles.transactionNote, { color: colors?.subtext }]}
                             numberOfLines={1}
+                            {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}
                           >
                             {t.note}
                           </Text>
@@ -660,9 +697,10 @@ export default function HomeScreen() {
                       )}
                     </View>
                   </View>
-                  <Text
-                    style={[
-                      styles.transactionAmount,
+                  <View style={{ flexShrink: 0 }}>
+                    <Text
+                      style={[
+                        styles.transactionAmount,
                       {
                         color:
                           t.type === "income" ? colors?.income : colors?.expense,
@@ -675,6 +713,7 @@ export default function HomeScreen() {
                       maximumFractionDigits: 2,
                     })}
                   </Text>
+                  </View>
                 </View>
               </TouchableOpacity>
             ))}
@@ -707,11 +746,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   greeting: {
-    fontSize: 14,
+    fontSize: 12,
     marginBottom: 4,
   },
   username: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "700",
   },
   settingsButton: {
@@ -745,7 +784,7 @@ const styles = StyleSheet.create({
   },
   balanceAmount: {
     color: "#FFFFFF",
-    fontSize: 36,
+    fontSize: 28,
     fontWeight: "800",
     marginBottom: 20,
     letterSpacing: -1,
@@ -761,9 +800,14 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
+    minWidth: 0,
+    overflow: "hidden",
   },
   statContent: {
+    flex: 1,
     marginLeft: 12,
+    minWidth: 0,
+    overflow: "hidden",
   },
   statLabel: {
     color: "#FFFFFF",
@@ -773,7 +817,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
   },
   statDivider: {
@@ -804,7 +848,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: "#FFFFFF",
     fontWeight: "700",
-    fontSize: 16,
+    fontSize: 14,
   },
   card: {
     marginHorizontal: 20,
@@ -821,21 +865,28 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
+    flexWrap: "wrap",
   },
   cardHeaderLeft: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
+    minWidth: 0,
+  },
+  cardHeaderText: {
+    flex: 1,
+    minWidth: 0,
   },
   cardIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: 10,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "700",
   },
   quickStatsContainer: {
@@ -853,43 +904,46 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   quickStatIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginRight: 10,
   },
   quickStatContent: {
     flex: 1,
+    minWidth: 0,
+    overflow: "hidden",
   },
   quickStatLabel: {
     fontSize: 12,
     marginBottom: 4,
   },
   quickStatValue: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "700",
   },
   chartControls: {
     flexDirection: "row",
-    gap: 8,
+    gap: 6,
     alignItems: "center",
+    flexShrink: 0,
   },
   // chartTypeSelector Styles ลบออกหรือปล่อยไว้ก็ได้เพราะไม่ได้ใช้แล้ว
   timeRangeSelector: {
     flexDirection: "row",
-    gap: 3,
-    borderRadius: 10,
-    padding: 3,
+    gap: 2,
+    borderRadius: 8,
+    padding: 2,
   },
   timeRangeButton: {
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
   timeRangeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "400",
   },
   cardSubtitle: {
@@ -899,28 +953,37 @@ const styles = StyleSheet.create({
   chartLegend: {
     flexDirection: "row",
     justifyContent: "center",
-    gap: 20,
+    flexWrap: "wrap",
+    gap: 12,
     marginTop: 8,
     marginBottom: 4,
   },
   legendItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 4,
   },
   legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   legendText: {
-    fontSize: 12,
+    fontSize: 11,
   },
   legendHint: {
-    fontSize: 10,
+    fontSize: 9,
     opacity: 0.8,
     marginLeft: 8,
     alignSelf: "center",
+  },
+  chartTooltipDot: {
+    position: "absolute",
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
   },
   chartTooltipBox: {
     position: "absolute",
@@ -928,6 +991,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 4,
+    borderWidth: 1,
   },
   chartTooltipLabel: {
     fontSize: 11,
@@ -963,33 +1027,39 @@ const styles = StyleSheet.create({
   chartSummary: {
     flexDirection: "row",
     justifyContent: "space-around",
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     marginBottom: 8,
     borderRadius: 12,
   },
   chartSummaryItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
   },
   chartSummaryDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   chartSummaryContent: {
     alignItems: "flex-start",
+    flex: 1,
+    minWidth: 0,
+    overflow: "hidden",
   },
   chartSummaryLabel: {
-    fontSize: 11,
+    fontSize: 10,
     marginBottom: 2,
   },
   chartSummaryValue: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
   },
   seeAllText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
   },
   transactionsList: {
@@ -1014,7 +1084,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   transactionCategory: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
     marginBottom: 4,
   },
@@ -1034,7 +1104,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   transactionAmount: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
   },
   emptyState: {
@@ -1043,12 +1113,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
     marginTop: 12,
   },
   emptySubText: {
-    fontSize: 13,
+    fontSize: 12,
     marginTop: 4,
     opacity: 0.7,
   },

@@ -147,8 +147,8 @@ export default function SettingsScreen() {
       {/* Choose Your Look */}
       <View style={[styles.themeSection, { backgroundColor: colors.card }]}>
         <View style={styles.themeHeader}>
-          <Text style={[styles.themeTitle, { color: colors.text }]}>Choose Your Look</Text>
-          <Text style={[styles.themeCount, { color: colors.subtext }]}>6 Themes Available</Text>
+          <Text style={[styles.themeTitle, { color: colors.text }]}>เลือกธีมที่คุณชอบ</Text>
+          <Text style={[styles.themeCount, { color: colors.subtext }]}></Text>
         </View>
         <View style={styles.themeRow}>
           {[

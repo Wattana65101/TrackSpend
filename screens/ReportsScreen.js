@@ -6,6 +6,7 @@ import {
   Dimensions,
   ScrollView,
   TouchableOpacity,
+  Platform,
 } from "react-native";
 import { AppContext, expenseCategories, incomeCategories } from "./AppContext";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -67,7 +68,7 @@ function getApexRadialBarHtml(data, width, height) {
               enabled: true,
               useSeriesColors: true,
               offsetX: -8,
-              fontSize: '13px',
+              fontSize: '11px',
               formatter: function(seriesName, opts) {
                 var val = opts.w.globals.series[opts.seriesIndex];
                 return seriesName + ":  " + val + "%";
@@ -167,6 +168,10 @@ export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
   const screenWidth = Dimensions.get("window").width;
 
+  // สีเส้นกราฟ: รายรับ = เขียว, รายจ่าย = แดง (ตามธีม)
+  const chartIncomeLineColor = colors?.chartIncome || colors?.income;
+  const chartExpenseLineColor = colors?.chartExpense || colors?.expense;
+
   const expenseData = useMemo(() => {
     if (!transactions) return [];
 
@@ -249,7 +254,8 @@ export default function ReportsScreen() {
     const monthKeys = [];
     const incomeByMonth = [];
     const expenseByMonth = [];
-    for (let i = monthCount - 1; i >= 0; i--) {
+    // เดือนปัจจุบันอยู่หน้าสุด (i=0 = ปัจจุบัน, i=1 = 1 เดือนที่แล้ว, ...)
+    for (let i = 0; i < monthCount; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const y = d.getFullYear() + 543;
       const shortYear = String(y).slice(-2);
@@ -335,7 +341,7 @@ export default function ReportsScreen() {
         styles.container,
         { backgroundColor: colors?.background, paddingTop: insets.top + 10 },
       ]}
-      contentContainerStyle={{ paddingBottom: (insets.bottom || 20) + 72 }}
+      contentContainerStyle={{ paddingBottom: (insets.bottom || 20) + 100 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
@@ -382,8 +388,8 @@ export default function ReportsScreen() {
                     monthlyChartData.expense,
                     screenWidth - 80,
                     260,
-                    colors?.income || "#10B981",
-                    colors?.expense || "#EF4444"
+                    chartIncomeLineColor,
+                    chartExpenseLineColor
                   ),
                 }}
                 style={{ backgroundColor: "transparent" }}
@@ -412,8 +418,11 @@ export default function ReportsScreen() {
                 </View>
               </View>
             </View>
-            <Text style={[styles.monthSelectorLabel, { color: colors?.subtext }]}>
-              กดบนกราฟหรือเลือกเดือนเพื่อดูรายละเอียด
+            <Text
+              style={[styles.monthSelectorLabel, { color: colors?.subtext }]}
+              {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}
+            >
+              เลือกเดือนเพื่อดูรายละเอียด
             </Text>
             <ScrollView
               horizontal
@@ -619,7 +628,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: "800",
     marginBottom: 4,
   },
@@ -651,7 +660,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "700",
   },
   emptyChart: {
@@ -679,7 +688,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   monthSelectorLabel: {
-    fontSize: 13,
+    fontSize: 12,
     marginTop: 14,
     marginBottom: 8,
   },

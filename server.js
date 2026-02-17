@@ -402,6 +402,7 @@ app.delete("/api/budgets/:id", verifyToken, (req, res) => {
   });
 });
 
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", () => {
   console.log(`🚀 Server running at http://localhost:${port}`);
+  console.log(`   เข้าได้จากเครื่องอื่น: http://<IP เครื่อง>:${port}`);
 });

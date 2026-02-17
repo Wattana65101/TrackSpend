@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppContext, expenseCategories, incomeCategories } from "./AppContext";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
 const { width } = Dimensions.get("window");
@@ -108,6 +108,19 @@ export default function AddTransactionScreen() {
     }
   }, [route.params?.type]);
 
+  // รีเซ็ตฟอร์มเมื่อเข้ามาหน้าเพิ่มรายการใหม่
+  useFocusEffect(
+    React.useCallback(() => {
+      const paramType = route.params?.type || "expense";
+      setType(paramType);
+      setSelectedCategory(null);
+      setAmount("");
+      setNote("");
+      previousCategoryRef.current = null;
+      return () => {};
+    }, [route.params?.type])
+  );
+
   // เคลียร์หมวดที่เลือกถ้าหมวดนั้นไม่มีในงบแล้ว (เฉพาะรายจ่าย)
   useEffect(() => {
     if (type === "expense" && selectedCategory && !budgetCategoryNames.includes(selectedCategory.name)) {
@@ -123,6 +136,7 @@ export default function AddTransactionScreen() {
       const categoryName = selectedCategory.name;
       if (previousCategoryRef.current !== categoryName) {
         setAmount("");
+        setNote("");
         previousCategoryRef.current = categoryName;
       }
       if (amountInputRef.current) {

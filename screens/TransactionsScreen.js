@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   Modal,
+  Platform,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppContext, expenseCategories, incomeCategories } from "./AppContext";
@@ -72,14 +73,26 @@ export default function TransactionsScreen() {
 
           {/* รายละเอียด */}
           <View style={styles.transactionDetails}>
-            <Text style={[styles.transactionCategory, { color: colors?.text }]}>
+            <Text
+              style={[styles.transactionCategory, { color: colors?.text }]}
+              {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}
+            >
               {item.category || "ไม่ระบุหมวดหมู่"}
             </Text>
-            <Text style={[styles.transactionNote, { color: colors?.subtext }]}>
+            <Text
+              style={[styles.transactionNote, { color: colors?.subtext }]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+              {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}
+            >
               {item.note || "ไม่มีหมายเหตุ"}
             </Text>
             {item.date && (
-              <Text style={[styles.transactionDate, { color: colors?.subtextLight || colors?.subtext }]}>
+              <Text
+                style={[styles.transactionDate, { color: colors?.subtextLight || colors?.subtext }]}
+                numberOfLines={1}
+                {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}
+              >
                 {new Date(item.date).toLocaleDateString("th-TH", {
                   year: "numeric",
                   month: "short",
@@ -90,12 +103,13 @@ export default function TransactionsScreen() {
           </View>
 
           {/* จำนวนเงิน */}
-          <View style={styles.amountContainer}>
+          <View style={[styles.amountContainer, { flexShrink: 0 }]}>
             <Text
               style={[
                 styles.transactionAmount,
                 { color: iconColor },
               ]}
+              {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}
             >
               {item.type === "income" ? "+" : "-"}฿
               {safeAmount.toLocaleString(undefined, {
@@ -141,7 +155,10 @@ export default function TransactionsScreen() {
           }
           renderItem={renderItem}
           extraData={{ transactions, colors }}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: (insets.bottom || 0) + 88 },
+          ]}
           showsVerticalScrollIndicator={false}
         />
       ) : (
@@ -230,7 +247,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: "800",
     marginBottom: 4,
   },
@@ -240,7 +257,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 100,
   },
   transactionItem: {
     flexDirection: "row",
@@ -264,14 +281,15 @@ const styles = StyleSheet.create({
   },
   transactionDetails: {
     flex: 1,
+    minWidth: 0,
   },
   transactionCategory: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
     marginBottom: 4,
   },
   transactionNote: {
-    fontSize: 14,
+    fontSize: 12,
     marginBottom: 4,
   },
   transactionDate: {
@@ -283,7 +301,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   transactionAmount: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "700",
   },
   emptyContainer: {
