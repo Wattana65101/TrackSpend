@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,11 +7,86 @@ import {
   TextInput,
   Alert,
   ScrollView,
+  Dimensions,
+  Animated,
 } from "react-native";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { AppContext } from "./AppContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Ionicons from "react-native-vector-icons/Ionicons";
+
+const { width } = Dimensions.get("window");
+const GAP = 10;
+const ROW_PAD = 20 + 16;
+const SWATCH_SIZE = (width - ROW_PAD * 2 - GAP * 5) / 6;
+
+function ThemeSwatch({ item, selected, onPress, colors }) {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const checkOpacity = useRef(new Animated.Value(selected ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: selected ? 1.08 : 1,
+        useNativeDriver: true,
+        tension: 200,
+        friction: 12,
+      }),
+      Animated.timing(checkOpacity, {
+        toValue: selected ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [selected]);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      tension: 300,
+      friction: 10,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: selected ? 1.08 : 1,
+      useNativeDriver: true,
+      tension: 200,
+      friction: 12,
+    }).start();
+  };
+
+  return (
+    <TouchableOpacity
+      activeOpacity={1}
+      style={styles.themeSwatchWrap}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      onPress={onPress}
+    >
+      <Animated.View
+        style={[
+          styles.themeSwatch,
+          {
+            backgroundColor: item.color,
+            borderColor: selected ? "#FFFFFF" : "transparent",
+            borderWidth: selected ? 2.5 : 0,
+            transform: [{ scale: scaleAnim }],
+          },
+        ]}
+      >
+        <Animated.View style={[styles.checkWrap, { opacity: checkOpacity }]} pointerEvents="none">
+          <Ionicons name="checkmark" size={SWATCH_SIZE * 0.45} color="#FFFFFF" />
+        </Animated.View>
+      </Animated.View>
+      <Text style={[styles.themeName, { color: colors.subtext }]} numberOfLines={1}>
+        {item.label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
 
 export default function SettingsScreen() {
   const { username, setUsername, theme, setTheme, colors, setToken } =
@@ -69,42 +144,28 @@ export default function SettingsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* เปลี่ยนธีม */}
-      <View style={[styles.card, { backgroundColor: colors.card }]}>
-        <Text style={[styles.label, { color: colors.text }]}>ธีม</Text>
-        <View style={styles.themeContainer}>
+      {/* Choose Your Look */}
+      <View style={[styles.themeSection, { backgroundColor: colors.card }]}>
+        <View style={styles.themeHeader}>
+          <Text style={[styles.themeTitle, { color: colors.text }]}>Choose Your Look</Text>
+          <Text style={[styles.themeCount, { color: colors.subtext }]}>6 Themes Available</Text>
+        </View>
+        <View style={styles.themeRow}>
           {[
-            { id: "emerald", icon: "leaf-outline", label: "Emerald", color: "#059669" },
-            { id: "ocean", icon: "water-outline", label: "Ocean", color: "#0EA5E9" },
-            { id: "purple", icon: "color-palette-outline", label: "Purple", color: "#8B5CF6" },
-            { id: "sunset", icon: "sunny-outline", label: "Sunset", color: "#F97316" },
-            { id: "forest", icon: "tree-outline", label: "Forest", color: "#16A34A" },
-            { id: "dark", icon: "moon-outline", label: "Dark", color: "#10B981" },
+            { id: "emerald", label: "Emerald", color: "#059669" },
+            { id: "ocean", label: "Ocean", color: "#0EA5E9" },
+            { id: "purple", label: "Purple", color: "#8B5CF6" },
+            { id: "sunset", label: "Sunset", color: "#F97316" },
+            { id: "forest", label: "Forest", color: "#16A34A" },
+            { id: "dark", label: "Dark", color: "#1F2937" },
           ].map((item) => (
-            <TouchableOpacity
+            <ThemeSwatch
               key={item.id}
-              style={[
-                styles.themeButton,
-                {
-                  backgroundColor: theme === item.id ? item.color : colors.backgroundLight || colors.background,
-                  borderColor: theme === item.id ? item.color : colors.subtext,
-                  borderWidth: 2,
-                },
-              ]}
+              item={item}
+              selected={theme === item.id}
               onPress={() => handleThemeChange(item.id)}
-            >
-              <Ionicons 
-                name={item.icon} 
-                size={24} 
-                color={theme === item.id ? "#FFFFFF" : item.color} 
-              />
-              <Text style={[
-                styles.themeText, 
-                { color: theme === item.id ? "#FFFFFF" : colors.text }
-              ]}>
-                {item.label}
-              </Text>
-            </TouchableOpacity>
+              colors={colors}
+            />
           ))}
         </View>
       </View>
@@ -142,29 +203,51 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonText: { color: "#fff", fontWeight: "bold" },
-  themeContainer: {
+  themeSection: {
+    padding: 18,
+    borderRadius: 16,
+    marginBottom: 20,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+  },
+  themeHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    marginBottom: 14,
+  },
+  themeTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  themeCount: {
+    fontSize: 12,
+  },
+  themeRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginTop: 10,
-    gap: 12,
+    gap: GAP,
   },
-  themeButton: {
+  themeSwatchWrap: {
+    alignItems: "center",
+    width: SWATCH_SIZE,
+  },
+  themeSwatch: {
+    width: SWATCH_SIZE,
+    height: SWATCH_SIZE,
+    borderRadius: SWATCH_SIZE / 2,
     alignItems: "center",
     justifyContent: "center",
-    padding: 16,
-    borderRadius: 16,
-    width: "30%",
-    minWidth: 100,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  themeText: { 
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: "600",
+  checkWrap: {
+    position: "absolute",
+  },
+  themeName: {
+    fontSize: 11,
+    marginTop: 6,
   },
   logoutButton: {
     marginTop: 20,

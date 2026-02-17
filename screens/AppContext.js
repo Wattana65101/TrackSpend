@@ -248,21 +248,14 @@ export function AppProvider({ children }) {
         setTransactions(transactionsData);
         
         // เช็คว่าเป็นบัญชีใหม่หรือไม่ (เฉพาะตอน login ครั้งแรกเท่านั้น)
-        // แสดง onboarding เฉพาะเมื่อ: ไม่มี transactions, และยังไม่เคยดู onboarding, และยังไม่เคยเช็ค
-        // ใช้ hasCheckedNewUser จาก dependency array (จะได้ค่าใหม่ทุกครั้งที่ state เปลี่ยน)
+        // บัญชีที่ไม่มี transactions = บัญชีใหม่ → แสดง onboarding เสมอ (ไม่สน hasSeenOnboarding จาก AsyncStorage
+        // เพราะค่าเก่าอาจเป็นของบัญชีอื่นบนอุปกรณ์เดียวกัน)
         if (!hasCheckedNewUser && transactionsData.length === 0) {
-          const hasSeenStored = await AsyncStorage.getItem("hasSeenOnboarding");
-          const hasSeenValue = hasSeenStored === "true";
-          
-          if (!hasSeenValue) {
-            setIsNewUser(true);
-            setHasSeenOnboarding(false);
-            setHasCheckedNewUser(true);
-            console.log("✅ New user detected on first login - will show onboarding");
-          } else {
-            setIsNewUser(false);
-            setHasCheckedNewUser(true);
-          }
+          setIsNewUser(true);
+          setHasSeenOnboarding(false);
+          await AsyncStorage.setItem("hasSeenOnboarding", "false");
+          setHasCheckedNewUser(true);
+          console.log("✅ New user detected (no transactions) - will show onboarding");
         } else if (!hasCheckedNewUser) {
           // ถ้ามี transactions = ไม่ใช่บัญชีใหม่
           setIsNewUser(false);
