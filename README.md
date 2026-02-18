@@ -59,7 +59,7 @@ npm install
    - Import schema: `mysql -u root -p trackspend < database/schema.sql`
 
 4. **Configure Server**
-   - สร้างไฟล์ `.env` จาก `docker\docker.env.example` (ถ้าใช้ Docker)
+   - สร้างไฟล์ `.env` จาก `.env.example`
    - แก้ไข `BASE_URL` ใน `screens/AppContext.js` ให้ตรงกับ IP address ของ server
    - สำหรับ Docker: ตั้งค่า `DB_HOST=localhost` และ `DB_PORT=3308` ใน `.env`
    - สำหรับ MySQL แบบปกติ: ตั้งค่า `DB_HOST=127.0.0.1` และ `DB_PORT=3306`
