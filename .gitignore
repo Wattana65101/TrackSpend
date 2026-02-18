@@ -94,3 +94,6 @@ trackspend_*.sql
 docker-compose.override.yml
 .env
 *.env.local
+
+# Cloudflare Tunnel (สร้างจาก script ได้จาก cloudflare-tunnel.example.yml)
+cloudflare-tunnel.yml

@@ -2,7 +2,8 @@
  * API Base URL - แก้ตามเครื่องที่ใช้ทดสอบ
  * - Emulator: "http://10.0.2.2:500"
  * - เครื่องจริง: "http://<IP คอมคุณ>:500" (เช่น http://192.168.1.35:500)
- *   หา IP: cmd → ipconfig → IPv4 Address (โทรศัพท์และคอมต้องอยู่ใน WiFi เดียวกัน)
+ * - Cloudflare Tunnel: ใช้ URL จาก cloudflared (เช่น https://xxx.trycloudflare.com)
  */
-// Emulator: "http://10.0.2.2:500" | เครื่องจริง: ใช้ IP จาก ipconfig
-export const BASE_URL = "http://172.18.34.70:500";
+// Quick Tunnel (ชั่วคราว): https://xxx.trycloudflare.com
+// Named Tunnel (โดเมนคุณ): ใส่ hostname ที่ตั้งใน Cloudflare Tunnel
+export const BASE_URL = "https://civilian-notre-subsequently-clothing.trycloudflare.com";

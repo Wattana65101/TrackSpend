@@ -1,0 +1,13 @@
+# Cloudflare Tunnel config สำหรับ TrackSpend API
+# 1. คัดลอกเป็น cloudflare-tunnel.yml
+# 2. รัน: cloudflared tunnel create trackspend-api แล้วใส่ TUNNEL_ID ด้านล่าง
+# 3. แก้ hostname เป็น subdomain ที่ต้องการ (เช่น trackspend-api.yourdomain.com)
+# 4. รัน: cloudflared tunnel --config cloudflare-tunnel.yml run
+
+# tunnel: <TUNNEL_ID>
+# credentials-file: C:\Users\<USER>\.cloudflared\<TUNNEL_ID>.json
+
+# ingress:
+#   - hostname: trackspend-api.yourdomain.com
+#     service: http://localhost:500
+#   - service: http_status:404
