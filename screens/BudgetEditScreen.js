@@ -8,6 +8,7 @@ import {
   Alert,
 } from "react-native";
 import { AppContext } from "./AppContext";
+import { headingCard, buttonPrimary } from "../config/styles";
 
 export default function BudgetEditScreen({ route, navigation }) {
   const { budget } = route.params;
@@ -44,7 +45,7 @@ export default function BudgetEditScreen({ route, navigation }) {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.text }]}>
+      <Text style={[headingCard(colors), styles.titleLayout]}>
         แก้ไขงบประมาณ: {budget.category}
       </Text>
       <TextInput
@@ -62,7 +63,7 @@ export default function BudgetEditScreen({ route, navigation }) {
         style={[styles.button, { backgroundColor: colors.primary }]}
         onPress={handleSave}
       >
-        <Text style={styles.buttonText}>บันทึก</Text>
+        <Text style={buttonPrimary()}>บันทึก</Text>
       </TouchableOpacity>
     </View>
   );
@@ -70,9 +71,7 @@ export default function BudgetEditScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", padding: 20 },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
+  titleLayout: {
     marginBottom: 20,
     textAlign: "center",
   },
@@ -83,5 +82,4 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   button: { borderRadius: 8, padding: 15, alignItems: "center" },
-  buttonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });

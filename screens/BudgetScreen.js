@@ -12,6 +12,7 @@ import {
   ScrollView,
 } from "react-native";
 import { AppContext, expenseCategories } from "./AppContext";
+import { headingPage, subtitle } from "../config/styles";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -316,8 +317,8 @@ export default function BudgetScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: colors.text }]}>เป้าหมายการจ่ายใช้</Text>
-          <Text style={[styles.subtitle, { color: colors.subtext }]}>
+          <Text style={[headingPage(colors), styles.titleLayout]}>เป้าหมายการจ่ายใช้</Text>
+          <Text style={subtitle(colors)}>
             {budgets.length} งบประมาณ
           </Text>
         </View>
@@ -614,15 +615,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     paddingTop: 10,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
+  titleLayout: { marginBottom: 4 },
   addButton: {
     width: 52,
     height: 52,

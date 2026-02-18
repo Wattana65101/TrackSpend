@@ -9,6 +9,7 @@ import {
   Platform,
 } from "react-native";
 import { AppContext, expenseCategories, incomeCategories } from "./AppContext";
+import { headingPage, subtitle } from "../config/styles";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { WebView } from "react-native-webview";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -347,8 +348,8 @@ export default function ReportsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: colors?.text }]}>รายงาน</Text>
-          <Text style={[styles.subtitle, { color: colors?.subtext }]}>
+          <Text style={[headingPage(colors), styles.titleLayout]}>รายงาน</Text>
+          <Text style={subtitle(colors)}>
             สรุปการเงินของคุณ
           </Text>
         </View>
@@ -627,15 +628,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 20,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
+  titleLayout: { marginBottom: 4 },
   card: {
     marginHorizontal: 20,
     marginBottom: 20,

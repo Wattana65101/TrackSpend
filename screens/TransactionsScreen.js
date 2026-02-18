@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppContext, expenseCategories, incomeCategories } from "./AppContext";
+import { headingSection, subtitle } from "../config/styles";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
 export default function TransactionsScreen() {
@@ -138,10 +139,10 @@ export default function TransactionsScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: colors?.text }]}>
+          <Text style={[headingSection(colors), styles.titleLayout]}>
             รายการทั้งหมด
           </Text>
-          <Text style={[styles.subtitle, { color: colors?.subtext }]}>
+          <Text style={subtitle(colors)}>
             {transactions?.length || 0} รายการ
           </Text>
         </View>
@@ -246,15 +247,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     paddingTop: 10,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "800",
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
+  titleLayout: { marginBottom: 4 },
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 100,

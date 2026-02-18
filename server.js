@@ -1,10 +1,22 @@
 require("dotenv").config();
+const crypto = require("crypto");
 const express = require("express");
 const mysql = require("mysql2");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const bodyParser = require("body-parser");
 const cors = require("cors");
+const nodemailer = require("nodemailer");
+
+// ส่งอีเมล: Resend หรือ Gmail (Nodemailer) - ใช้อย่างใดอย่างหนึ่ง
+let resend = null;
+try {
+  if (process.env.RESEND_API_KEY) {
+    const { Resend } = require("resend");
+    resend = new Resend(process.env.RESEND_API_KEY);
+  }
+} catch (_) {}
+const useGmail = !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 
 const app = express();
 const port = process.env.SERVER_PORT || 500;
@@ -18,6 +30,7 @@ app.use(cors({
   credentials: true
 }));
 app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // DB connection
 // ⚠️ หมายเหตุ: ควรใช้ environment variables สำหรับ production
@@ -37,6 +50,27 @@ db.connect((err) => {
     return;
   }
   console.log("✅ Connected to MySQL database!");
+  if (useGmail) {
+    if ((process.env.GMAIL_USER || "").includes("your.email")) {
+      console.log("⚠️ GMAIL_USER ยังเป็น placeholder - เปลี่ยนเป็นอีเมล Gmail จริงใน .env");
+    } else {
+      console.log("📧 ส่งอีเมล: Gmail พร้อมใช้งาน");
+    }
+  } else if (resend) console.log("📧 ส่งอีเมล: Resend พร้อมใช้งาน");
+  else console.log("⚠️ ส่งอีเมล: โหมด dev (ดูรหัสที่ terminal)");
+  // สร้างตาราง password_reset_tokens ถ้ายังไม่มี
+  db.query(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      token VARCHAR(255) NOT NULL,
+      expires_at DATETIME NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      INDEX idx_token (token),
+      INDEX idx_expires (expires_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `, (e) => { if (e) console.warn("⚠️ password_reset_tokens table:", e.message); });
 });
 
 // JWT verify middleware
@@ -158,6 +192,134 @@ app.post("/api/login", (req, res) => {
       token,
       username: user.username, // ✅ ส่ง username กลับไปด้วย
       phone: user.phone,       // ✅ ส่ง phone กลับไปด้วย
+    });
+  });
+});
+
+// ส่งอีเมลรหัสยืนยัน (Gmail ผ่าน Nodemailer)
+async function sendCodeByGmail(toEmail, code) {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.GMAIL_USER,
+      pass: process.env.GMAIL_APP_PASSWORD,
+    },
+  });
+  await transporter.sendMail({
+    from: `"TrackSpend" <${process.env.GMAIL_USER}>`,
+    to: toEmail,
+    subject: "รหัสยืนยันตัวตน TrackSpend",
+    html: `
+      <div style="font-family: sans-serif; max-width: 400px;">
+        <h2 style="color: #059669;">TrackSpend - รหัสยืนยันตัวตน</h2>
+        <p>คุณได้ขอรีเซ็ตรหัสผ่าน รหัสยืนยัน 6 หลักของคุณคือ</p>
+        <p style="font-size: 28px; font-weight: bold; letter-spacing: 8px; color: #064E3B;">${code}</p>
+        <p style="color: #6B7280; font-size: 14px;">รหัสหมดอายุใน 10 นาที กรุณาอย่าส่งรหัสนี้ให้ใคร</p>
+        <p style="color: #6B7280; font-size: 12px;">หากคุณไม่ได้ขอดูเมลนี้ กรุณาไม่ต้องทำอะไร</p>
+      </div>
+    `,
+  });
+}
+
+// ✅ Forgot Password - ส่งรหัส 6 หลักยืนยันตัวตนทางอีเมล (Resend หรือ Gmail)
+app.post("/api/forgot-password", async (req, res) => {
+  const { email } = req.body;
+  if (!email || typeof email !== "string" || !email.trim()) {
+    return res.status(400).json({ success: false, message: "กรุณากรอกอีเมล" });
+  }
+  const emailTrim = email.trim();
+  const q = "SELECT id FROM users WHERE email = ?";
+  db.query(q, [emailTrim], (err, rows) => {
+    if (err) {
+      console.error("❌ forgot-password DB error:", err);
+      return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์" });
+    }
+    if (rows.length === 0) {
+      return res.status(200).json({ success: true, message: "ถ้ามีบัญชีผูกกับอีเมลนี้ จะส่งรหัสยืนยันให้" });
+    }
+    const userId = rows[0].id;
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const insertQ = "INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES (?, ?, ?)";
+    db.query(insertQ, [userId, code, expiresAt], async (err2) => {
+      if (err2) {
+        console.error("❌ insert reset token error:", err2);
+        return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์" });
+      }
+
+      // ตัวเลือก 1: Resend
+      if (resend) {
+        try {
+          const fromEmail = process.env.RESEND_FROM || "TrackSpend <onboarding@resend.dev>";
+          const { error } = await resend.emails.send({
+            from: fromEmail,
+            to: [emailTrim],
+            subject: "รหัสยืนยันตัวตน TrackSpend",
+            html: `<div style="font-family: sans-serif; max-width: 400px;"><h2 style="color: #059669;">TrackSpend - รหัสยืนยันตัวตน</h2><p>รหัสยืนยัน 6 หลักของคุณคือ</p><p style="font-size: 28px; font-weight: bold; letter-spacing: 8px; color: #064E3B;">${code}</p><p style="color: #6B7280; font-size: 14px;">รหัสหมดอายุใน 10 นาที</p></div>`,
+          });
+          if (error) throw error;
+          console.log("✅ [Resend] Verification code sent to:", emailTrim);
+          return res.status(200).json({ success: true, message: "เราได้ส่งรหัส 6 หลักไปยังอีเมลของคุณแล้ว กรุณาตรวจสอบอีเมล (รวมถึงโฟลเดอร์สแปม)" });
+        } catch (sendErr) {
+          console.error("❌ Resend error:", sendErr);
+          return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดในการส่งอีเมล กรุณาลองใหม่" });
+        }
+      }
+
+      // ตัวเลือก 2: Gmail (Nodemailer)
+      if (useGmail) {
+        try {
+          await sendCodeByGmail(emailTrim, code);
+          console.log("✅ [Gmail] Verification code sent to:", emailTrim);
+          return res.status(200).json({ success: true, message: "เราได้ส่งรหัส 6 หลักไปยังอีเมลของคุณแล้ว กรุณาตรวจสอบอีเมล (รวมถึงโฟลเดอร์สแปม)" });
+        } catch (sendErr) {
+          console.error("❌ Gmail send error:", sendErr.message || sendErr);
+          return res.status(500).json({ success: false, message: "ส่งอีเมลไม่สำเร็จ: " + (sendErr.message || "ตรวจสอบ GMAIL_USER และ GMAIL_APP_PASSWORD ใน .env") });
+        }
+      }
+
+      // โหมด dev: ไม่มี Resend หรือ Gmail
+      console.log("🔑 [DEV] Verification code for", emailTrim, ":", code);
+      res.status(200).json({
+        success: true,
+        message: "รหัสถูกสร้างแล้ว (โหมด dev - ดูรหัสที่ terminal) กรุณากรอกรหัสด้านล่าง",
+        devCode: code,
+      });
+    });
+  });
+});
+
+// ✅ Reset Password - ยืนยันด้วยรหัส 6 หลัก แล้วตั้งรหัสผ่านใหม่
+app.post("/api/reset-password", (req, res) => {
+  const { email, code, newPassword } = req.body;
+  if (!email || !code || !newPassword || typeof newPassword !== "string") {
+    return res.status(400).json({ success: false, message: "กรุณากรอกอีเมล รหัสยืนยัน และรหัสผ่านใหม่ให้ครบ" });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ success: false, message: "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร" });
+  }
+  const codeStr = String(code).trim();
+  const q = `SELECT pr.user_id FROM password_reset_tokens pr
+    JOIN users u ON u.id = pr.user_id
+    WHERE u.email = ? AND pr.token = ? AND pr.expires_at > NOW()`;
+  db.query(q, [email.trim(), codeStr], (err, rows) => {
+    if (err) {
+      console.error("❌ reset-password DB error:", err);
+      return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์" });
+    }
+    if (rows.length === 0) {
+      return res.status(400).json({ success: false, message: "รหัสยืนยันไม่ถูกต้องหรือหมดอายุ กรุณาขอรหัสใหม่" });
+    }
+    const userId = rows[0].user_id;
+    const hashed = bcrypt.hashSync(newPassword, 8);
+    const updateQ = "UPDATE users SET password = ? WHERE id = ?";
+    db.query(updateQ, [hashed, userId], (err2) => {
+      if (err2) {
+        console.error("❌ update password error:", err2);
+        return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์" });
+      }
+      db.query("DELETE FROM password_reset_tokens WHERE user_id = ? AND token = ?", [userId, codeStr]);
+      res.status(200).json({ success: true, message: "ตั้งรหัสผ่านใหม่สำเร็จ! กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่" });
     });
   });
 });

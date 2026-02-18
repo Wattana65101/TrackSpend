@@ -2,7 +2,6 @@ import React, { useState, useRef, useContext } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   ScrollView,
   Dimensions,
@@ -12,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { AppContext } from "./AppContext";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { createOnboardingStyles } from "./OnboardingScreen.styles";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -56,6 +56,7 @@ const onboardingData = [
 export default function OnboardingScreen({ onComplete }) {
   const { colors, hexToRgbA } = useContext(AppContext);
   const insets = useSafeAreaInsets();
+  const styles = createOnboardingStyles(colors, hexToRgbA);
   const [currentPage, setCurrentPage] = useState(0);
   const scrollViewRef = useRef(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -95,23 +96,18 @@ export default function OnboardingScreen({ onComplete }) {
     setCurrentPage(page);
   };
 
+  const primary = colors?.primary || "#059669";
+  const subtext = colors?.subtext || "#6B7280";
+
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        { backgroundColor: colors?.background || "#ECFDF5" },
-        { opacity: fadeAnim },
-      ]}
-    >
+    <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
       {/* Skip Button */}
       <TouchableOpacity
         style={[styles.skipButton, { paddingTop: insets.top + 10 }]}
         onPress={handleSkip}
         activeOpacity={0.7}
       >
-        <Text style={[styles.skipText, { color: colors?.subtext || "#6B7280" }]}>
-          ข้าม
-        </Text>
+        <Text style={styles.skipText}>ข้าม</Text>
       </TouchableOpacity>
 
       {/* ScrollView for Pages */}
@@ -124,7 +120,7 @@ export default function OnboardingScreen({ onComplete }) {
         scrollEventThrottle={16}
         style={styles.scrollView}
       >
-        {onboardingData.map((item, index) => (
+        {onboardingData.map((item) => (
           <View key={item.id} style={[styles.page, { width: SCREEN_WIDTH }]}>
             <View style={styles.content}>
               {/* Icon */}
@@ -138,24 +134,10 @@ export default function OnboardingScreen({ onComplete }) {
               </View>
 
               {/* Title */}
-              <Text
-                style={[
-                  styles.title,
-                  { color: colors?.text || "#064E3B" },
-                ]}
-              >
-                {item.title}
-              </Text>
+              <Text style={[styles.title, styles.titleOverride]}>{item.title}</Text>
 
               {/* Description */}
-              <Text
-                style={[
-                  styles.description,
-                  { color: colors?.subtext || "#6B7280" },
-                ]}
-              >
-                {item.description}
-              </Text>
+              <Text style={styles.description}>{item.description}</Text>
             </View>
           </View>
         ))}
@@ -168,12 +150,12 @@ export default function OnboardingScreen({ onComplete }) {
             key={index}
             style={[
               styles.dot,
+              index === currentPage ? styles.dotActive : styles.dotInactive,
               {
                 backgroundColor:
                   index === currentPage
-                    ? colors?.primary || "#059669"
-                    : hexToRgbA(colors?.subtext || "#6B7280", 0.3),
-                width: index === currentPage ? 24 : 8,
+                    ? primary
+                    : hexToRgbA(subtext, 0.3),
               },
             ]}
           />
@@ -189,13 +171,7 @@ export default function OnboardingScreen({ onComplete }) {
       >
         {currentPage > 0 && (
           <TouchableOpacity
-            style={[
-              styles.button,
-              styles.buttonSecondary,
-              {
-                backgroundColor: hexToRgbA(colors?.subtext || "#6B7280", 0.1),
-              },
-            ]}
+            style={[styles.button, styles.buttonSecondary]}
             onPress={() => {
               const prevPage = currentPage - 1;
               scrollViewRef.current?.scrollTo({
@@ -206,30 +182,19 @@ export default function OnboardingScreen({ onComplete }) {
             }}
             activeOpacity={0.7}
           >
-            <Text
-              style={[
-                styles.buttonTextSecondary,
-                { color: colors?.subtext || "#6B7280" },
-              ]}
-            >
-              ย้อนกลับ
-            </Text>
+            <Text style={styles.buttonSecondaryText}>ย้อนกลับ</Text>
           </TouchableOpacity>
         )}
-
         <TouchableOpacity
           style={[
             styles.button,
             styles.buttonPrimary,
-            {
-              backgroundColor: colors?.primary || "#059669",
-              flex: currentPage === 0 ? 1 : 0.6,
-            },
+            { flex: currentPage === 0 ? 1 : 0.6 },
           ]}
           onPress={handleNext}
           activeOpacity={0.8}
         >
-          <Text style={styles.buttonTextPrimary}>
+          <Text style={styles.buttonPrimaryText}>
             {currentPage === onboardingData.length - 1 ? "เริ่มต้นใช้งาน" : "ถัดไป"}
           </Text>
           {currentPage < onboardingData.length - 1 && (
@@ -240,98 +205,3 @@ export default function OnboardingScreen({ onComplete }) {
     </Animated.View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  skipButton: {
-    position: "absolute",
-    top: 0,
-    right: 20,
-    zIndex: 10,
-    padding: 10,
-  },
-  skipText: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  page: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 40,
-  },
-  content: {
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
-  },
-  iconContainer: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 40,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  description: {
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 24,
-    paddingHorizontal: 20,
-  },
-  pagination: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 20,
-    gap: 8,
-  },
-  dot: {
-    height: 8,
-    borderRadius: 4,
-    transition: "all 0.3s",
-  },
-  buttonContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    gap: 12,
-    paddingTop: 20,
-  },
-  button: {
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-  },
-  buttonPrimary: {
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  buttonSecondary: {
-    flex: 0.4,
-  },
-  buttonTextPrimary: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  buttonTextSecondary: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});

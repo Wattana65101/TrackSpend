@@ -13,6 +13,7 @@ import {
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { GoogleSignin } from "@react-native-google-signin/google-signin";
 import { AppContext } from "./AppContext";
+import { headingCard, labelLarge, headingSubsection, captionSmall, buttonPrimary } from "../config/styles";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width } = Dimensions.get("window");
@@ -121,11 +122,11 @@ export default function SettingsScreen() {
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
     >
-      <Text style={[styles.title, { color: colors.text }]}>การตั้งค่า</Text>
+      <Text style={[headingCard(colors), styles.titleLayout]}>การตั้งค่า</Text>
 
       {/* ตั้งชื่อเล่น */}
       <View style={[styles.card, { backgroundColor: colors.card }]}>
-        <Text style={[styles.label, { color: colors.text }]}>ชื่อเล่น</Text>
+        <Text style={[labelLarge(colors), styles.labelLayout]}>ชื่อเล่น</Text>
         <TextInput
           style={[
             styles.input,
@@ -140,15 +141,15 @@ export default function SettingsScreen() {
           style={[styles.button, { backgroundColor: colors.primary }]}
           onPress={handleSave}
         >
-          <Text style={styles.buttonText}>บันทึก</Text>
+          <Text style={buttonPrimary()}>บันทึก</Text>
         </TouchableOpacity>
       </View>
 
       {/* Choose Your Look */}
       <View style={[styles.themeSection, { backgroundColor: colors.card }]}>
         <View style={styles.themeHeader}>
-          <Text style={[styles.themeTitle, { color: colors.text }]}>เลือกธีมที่คุณชอบ</Text>
-          <Text style={[styles.themeCount, { color: colors.subtext }]}></Text>
+          <Text style={headingSubsection(colors)}>เลือกธีมที่คุณชอบ</Text>
+          <Text style={captionSmall(colors)}></Text>
         </View>
         <View style={styles.themeRow}>
           {[
@@ -175,7 +176,7 @@ export default function SettingsScreen() {
         style={[styles.logoutButton, { backgroundColor: "#FF3B30" }]}
         onPress={handleLogout}
       >
-        <Text style={styles.logoutText}>ออกจากระบบ</Text>
+        <Text style={buttonPrimary()}>ออกจากระบบ</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -183,14 +184,14 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 20 },
-  title: { fontSize: 22, fontWeight: "bold", marginBottom: 20 },
+  titleLayout: { marginBottom: 20 },
   card: {
     padding: 15,
     borderRadius: 12,
     marginBottom: 20,
     elevation: 2,
   },
-  label: { fontSize: 16, marginBottom: 10, fontWeight: "bold" },
+  labelLayout: { marginBottom: 10 },
   input: {
     borderRadius: 8,
     paddingHorizontal: 15,
@@ -202,7 +203,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: "center",
   },
-  buttonText: { color: "#fff", fontWeight: "bold" },
   themeSection: {
     padding: 18,
     borderRadius: 16,
@@ -218,13 +218,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "baseline",
     marginBottom: 14,
-  },
-  themeTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  themeCount: {
-    fontSize: 12,
   },
   themeRow: {
     flexDirection: "row",
@@ -255,5 +248,4 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
   },
-  logoutText: { color: "#fff", fontWeight: "bold" },
 });

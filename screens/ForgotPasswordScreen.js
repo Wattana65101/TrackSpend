@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { AppContext } from "./AppContext";
+import { headingPage, subtitle, buttonPrimary } from "../config/styles";
 
 export default function ForgotPasswordScreen({ navigation }) {
   const { colors, BASE_URL, hexToRgbA } = useContext(AppContext);
@@ -19,22 +20,29 @@ export default function ForgotPasswordScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const handleForgotPassword = async () => {
-    if (!email) {
+    if (!email || !email.trim()) {
       Alert.alert("❌ ล้มเหลว", "กรุณากรอกอีเมล");
       return;
     }
 
     setLoading(true);
     try {
-      // TODO: Implement forgot password API
-      Alert.alert(
-        "✅ สำเร็จ",
-        "เราได้ส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลของคุณแล้ว กรุณาตรวจสอบอีเมล"
-      );
-      navigation.goBack();
+      const res = await fetch(`${BASE_URL}/api/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.success) {
+        Alert.alert("✅ ส่งรหัสสำเร็จ", data.message || "เราได้ส่งรหัส 6 หลักไปยังอีเมลของคุณแล้ว กรุณาตรวจสอบอีเมล");
+        navigation.replace("ResetPassword", { email: email.trim(), devCode: data.devCode });
+      } else {
+        Alert.alert("❌ ล้มเหลว", data.message || "เกิดข้อผิดพลาด กรุณาลองใหม่");
+      }
     } catch (error) {
       console.error("Forgot password error:", error);
-      Alert.alert("Error", "เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์");
+      Alert.alert("❌ ล้มเหลว", "เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์");
     } finally {
       setLoading(false);
     }
@@ -58,10 +66,8 @@ export default function ForgotPasswordScreen({ navigation }) {
           >
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.title, { color: colors.text }]}>ลืมรหัสผ่าน</Text>
-          <Text style={[styles.subtitle, { color: colors.subtext }]}>
-            กรุณากรอกอีเมลของคุณเพื่อรีเซ็ตรหัสผ่าน
-          </Text>
+          <Text style={[headingPage(colors), styles.titleLayout]}>ลืมรหัสผ่าน</Text>
+          <Text style={subtitle(colors)}>กรอกอีเมลเพื่อรับรหัส 6 หลักยืนยันตัวตนทางอีเมล</Text>
         </View>
 
         {/* Input Card */}
@@ -99,8 +105,8 @@ export default function ForgotPasswordScreen({ navigation }) {
             onPress={handleForgotPassword}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>
-              {loading ? "กำลังส่ง..." : "ส่งลิงก์รีเซ็ตรหัสผ่าน"}
+            <Text style={buttonPrimary()}>
+              {loading ? "กำลังส่ง..." : "ส่งรหัสยืนยัน"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -127,13 +133,8 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
+  titleLayout: {
     marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
   },
   card: {
     borderRadius: 24,
@@ -176,11 +177,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 18,
   },
 });
 

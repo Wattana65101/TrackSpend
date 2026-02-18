@@ -301,6 +301,17 @@ export default function LoginScreen({ navigation }) {
             </View>
           </View>
 
+          {/* ลืมรหัสผ่าน */}
+          <TouchableOpacity
+            style={styles.forgotPasswordLink}
+            onPress={() => navigation.navigate("ForgotPassword")}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.forgotPasswordText, { color: colors?.primary || emeraldGreen }]}>
+              ลืมรหัสผ่าน?
+            </Text>
+          </TouchableOpacity>
+
           {/* Login Button */}
           <TouchableOpacity
             style={[
@@ -560,6 +571,14 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: 16,
     marginLeft: 10,
+  },
+  forgotPasswordLink: {
+    alignSelf: "flex-end",
+    marginBottom: 16,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   registerLinkContainer: {
     alignItems: "center",
