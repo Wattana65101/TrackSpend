@@ -496,6 +496,7 @@ export function AppProvider({ children }) {
       theme,
       setTheme,
       fetchTransactionsAndBudgets,
+      fetchUserProfile,
       deleteTransaction,
       deleteBudget,   
       username,
@@ -509,7 +510,7 @@ export function AppProvider({ children }) {
       isNewUser,
       setIsNewUser,
     }),
-    [token, transactions, budgets, totalBalance, colors, theme, username, hasSeenOnboarding, isNewUser]
+    [token, transactions, budgets, totalBalance, colors, theme, username, hasSeenOnboarding, isNewUser, fetchUserProfile]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

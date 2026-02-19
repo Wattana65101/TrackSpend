@@ -90,18 +90,55 @@ function ThemeSwatch({ item, selected, onPress, colors }) {
 }
 
 export default function SettingsScreen() {
-  const { username, setUsername, theme, setTheme, colors, setToken } =
+  const { username, setUsername, theme, setTheme, colors, setToken, token, BASE_URL, fetchUserProfile } =
     useContext(AppContext);
 
   const [newNickname, setNewNickname] = useState(username || "");
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
+  // เมื่อกลับมาหน้าตั้งค่า หรือ username ใน context เปลี่ยน ให้อัปเดตช่องชื่อเล่น
+  useEffect(() => {
+    setNewNickname(username || "");
+  }, [username]);
+
+  const handleSave = async () => {
     if (!newNickname.trim()) {
       Alert.alert("ผิดพลาด", "กรุณากรอกชื่อเล่น");
       return;
     }
-    setUsername(newNickname);
-    Alert.alert("สำเร็จ", "บันทึกชื่อเล่นเรียบร้อยแล้ว");
+    if (!token) {
+      Alert.alert("ผิดพลาด", "กรุณาเข้าสู่ระบบก่อน");
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await fetch(`${BASE_URL}/api/user`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ username: newNickname.trim() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok && data.success) {
+        const savedName = data.username || newNickname.trim();
+        setUsername(savedName);
+        await AsyncStorage.setItem("username", savedName);
+        setNewNickname(savedName);
+        if (typeof fetchUserProfile === "function") {
+          await fetchUserProfile();
+        }
+        Alert.alert("สำเร็จ", "บันทึกชื่อเล่นเรียบร้อยแล้ว");
+      } else {
+        Alert.alert("ผิดพลาด", data.message || "ไม่สามารถบันทึกได้");
+      }
+    } catch (e) {
+      console.error("Save username error:", e);
+      Alert.alert("ผิดพลาด", "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleThemeChange = (selectedTheme) => {
@@ -124,9 +161,9 @@ export default function SettingsScreen() {
     >
       <Text style={[headingCard(colors), styles.titleLayout]}>การตั้งค่า</Text>
 
-      {/* ตั้งชื่อเล่น */}
+      {/* ตั้งชื่อเล่น (= username ในระบบ) */}
       <View style={[styles.card, { backgroundColor: colors.card }]}>
-        <Text style={[labelLarge(colors), styles.labelLayout]}>ชื่อเล่น</Text>
+        <Text style={[labelLarge(colors), styles.labelLayout]}>ชื่อเล่น (username)</Text>
         <TextInput
           style={[
             styles.input,
@@ -138,10 +175,11 @@ export default function SettingsScreen() {
           onChangeText={setNewNickname}
         />
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: colors.primary }]}
+          style={[styles.button, { backgroundColor: colors.primary, opacity: saving ? 0.7 : 1 }]}
           onPress={handleSave}
+          disabled={saving}
         >
-          <Text style={buttonPrimary()}>บันทึก</Text>
+          <Text style={buttonPrimary()}>{saving ? "กำลังบันทึก..." : "บันทึก"}</Text>
         </TouchableOpacity>
       </View>
 

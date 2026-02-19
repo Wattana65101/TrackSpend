@@ -32,6 +32,18 @@ app.use(cors({
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
+// Request log (method, path, status)
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const ms = Date.now() - start;
+    const status = res.statusCode;
+    const level = status >= 500 ? "ERROR" : status >= 400 ? "WARN" : "INFO";
+    console.log(`[${level}] ${req.method} ${req.path} ${status} ${ms}ms`);
+  });
+  next();
+});
+
 // DB connection
 // ⚠️ หมายเหตุ: ควรใช้ environment variables สำหรับ production
 // สำหรับ Docker: DB_HOST=localhost, DB_PORT=3308
@@ -182,10 +194,12 @@ app.post("/api/login", (req, res) => {
     const passwordIsValid = bcrypt.compareSync(password, user.password);
 
     if (!passwordIsValid) {
+      console.log("[Login] รหัสผ่านผิด email:", email);
       return res.status(401).json({ success: false, message: "รหัสผ่านไม่ถูกต้อง" });
     }
 
     const token = jwt.sign({ id: user.id }, SECRET_KEY, { expiresIn: "1d" });
+    console.log("[Login] สำเร็จ userId:", user.id, "email:", email);
     res.status(200).json({
       success: true,
       message: "เข้าสู่ระบบสำเร็จ!",
@@ -326,9 +340,11 @@ app.post("/api/reset-password", (req, res) => {
 
 // ✅ Google Login (ตรวจ idToken กับ Google แล้วสร้าง/เข้าบัญชี)
 // รองรับทั้ง Web และ Android client เพราะ idToken จากแอปอาจมี aud เป็นตัวใดตัวหนึ่ง
+// ถ้าโทเคนไม่ถูกต้อง: ดูที่ terminal ว่า [Google Login] แจ้ง aud เป็นอะไร แล้วเพิ่มใน .env เป็น GOOGLE_EXTRA_CLIENT_ID=ค่า_aud_นั้น
 const GOOGLE_WEB_CLIENT_ID = process.env.GOOGLE_WEB_CLIENT_ID || "660835922057-ag4kgdpq4jnt7gkektt7h3suml230mbj.apps.googleusercontent.com";
 const GOOGLE_ANDROID_CLIENT_ID = process.env.GOOGLE_ANDROID_CLIENT_ID || "660835922057-mup0rn0bl5v1t17bid0caljvsa8nqspo.apps.googleusercontent.com";
-const GOOGLE_CLIENT_IDS = [GOOGLE_WEB_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID];
+const GOOGLE_EXTRA = process.env.GOOGLE_EXTRA_CLIENT_ID ? process.env.GOOGLE_EXTRA_CLIENT_ID.split(",").map((s) => s.trim()).filter(Boolean) : [];
+const GOOGLE_CLIENT_IDS = [GOOGLE_WEB_CLIENT_ID, GOOGLE_ANDROID_CLIENT_ID, ...GOOGLE_EXTRA];
 
 function isAudienceValid(aud) {
   if (!aud) return false;
@@ -338,6 +354,7 @@ function isAudienceValid(aud) {
 
 app.post("/api/auth/google", async (req, res) => {
   const { idToken, phone, username: reqUsername } = req.body;
+  console.log("[Google Login] ได้รับ request มี idToken:", !!idToken, "phone:", !!phone);
   if (!idToken) {
     return res.status(400).json({ success: false, message: "ไม่มี idToken" });
   }
@@ -345,30 +362,41 @@ app.post("/api/auth/google", async (req, res) => {
     const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`;
     const resp = await fetch(url);
     const payload = await resp.json();
+    // log สิ่งที่ Google ส่งกลับ (ไม่รวม idToken)
+    console.log("[Google Login] tokeninfo:", {
+      hasError: !!payload.error,
+      error: payload.error || null,
+      error_description: payload.error_description || null,
+      aud: payload.aud || null,
+      email: payload.email || null,
+      email_verified: payload.email_verified,
+    });
     if (payload.error) {
       const msg = payload.error_description || payload.error || "โทเคน Google ไม่ถูกต้อง";
-      console.warn("Google tokeninfo error:", payload.error, "description:", payload.error_description);
+      console.warn("[Google Login] โทเคนไม่ผ่าน:", payload.error, payload.error_description);
       return res.status(401).json({ success: false, message: msg });
     }
     if (!isAudienceValid(payload.aud)) {
-      console.warn("Google token aud ไม่ตรง:", "aud=", payload.aud, "รอ:", GOOGLE_CLIENT_IDS);
+      console.warn("[Google Login] Client ID ไม่ตรง: โทเคนมี aud =", payload.aud, "| เซิร์ฟรับเฉพาะ:", GOOGLE_CLIENT_IDS);
       return res.status(401).json({
         success: false,
-        message: "Client ID ไม่ตรงกับเซิร์ฟเวอร์ (ลองออกจากแอปแล้วล็อกอิน Google ใหม่)",
+        message: "Client ID ในโทเคนไม่ตรงกับเซิร์ฟเวอร์ — ดู log ที่ terminal ที่รัน node server.js ว่า aud เป็นอะไร แล้วเพิ่มใน server หรือ Google Cloud Console",
       });
     }
+    console.log("[Google Login] aud ผ่านแล้ว ใช้ email จากโทเคน");
     const email = payload.email;
     const name = (payload.name || email).trim() || "User";
 
     const findQuery = "SELECT id, username, phone FROM users WHERE email = ?";
     db.query(findQuery, [email], (err, results) => {
       if (err) {
-        console.error("❌ DB error:", err);
+        console.error("[Google Login] DB error:", err.message);
         return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์" });
       }
       if (results.length > 0) {
         const user = results[0];
         const token = jwt.sign({ id: user.id }, SECRET_KEY, { expiresIn: "1d" });
+        console.log("[Google Login] สำเร็จ (มีบัญชีแล้ว) userId:", user.id, "email:", email);
         return res.status(200).json({
           success: true,
           isNewUser: false,
@@ -380,6 +408,7 @@ app.post("/api/auth/google", async (req, res) => {
       }
       const phoneDigits = (phone || "").toString().replace(/\D/g, "");
       if (phoneDigits.length !== 10) {
+        console.log("[Google Login] บัญชีใหม่ แต่ยังไม่มีเบอร์ 10 หลัก ส่ง needMoreInfo");
         return res.status(200).json({
           success: false,
           needMoreInfo: true,
@@ -393,15 +422,17 @@ app.post("/api/auth/google", async (req, res) => {
       const insertQuery = "INSERT INTO users (username, phone, email, password) VALUES (?, ?, ?, ?)";
       db.query(insertQuery, [username, phoneDigits, email, hashedPassword], (err2, insertResult) => {
         if (err2) {
-          console.error("❌ DB insert error:", err2);
+          console.error("[Google Login] DB insert error:", err2.message);
           return res.status(500).json({ success: false, message: "ไม่สามารถสร้างบัญชีได้" });
         }
         db.query("SELECT id, username, phone FROM users WHERE email = ?", [email], (err3, rows) => {
           if (err3 || !rows?.length) {
+            console.error("[Google Login] DB select หลัง insert error:", err3?.message);
             return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดหลังสร้างบัญชี" });
           }
           const user = rows[0];
           const token = jwt.sign({ id: user.id }, SECRET_KEY, { expiresIn: "1d" });
+          console.log("[Google Login] สำเร็จ (สร้างบัญชีใหม่) userId:", user.id, "email:", email);
           res.status(200).json({
             success: true,
             isNewUser: true,
@@ -414,7 +445,7 @@ app.post("/api/auth/google", async (req, res) => {
       });
     });
   } catch (e) {
-    console.error("Google auth error:", e);
+    console.error("[Google Login] exception:", e.message || e);
     res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดในการตรวจสอบ Google" });
   }
 });
@@ -493,6 +524,28 @@ app.get("/api/user", verifyToken, (req, res) => {
       return res.status(404).json({ success: false, message: "User not found." });
     }
     res.status(200).json({ success: true, user: results[0] });
+  });
+});
+
+// ✅ Update user profile (username)
+app.put("/api/user", verifyToken, (req, res) => {
+  const { username: newUsername } = req.body;
+  if (!newUsername || typeof newUsername !== "string" || !newUsername.trim()) {
+    return res.status(400).json({ success: false, message: "กรุณากรอกชื่อเล่น" });
+  }
+  const name = newUsername.trim().substring(0, 50);
+  const query = "UPDATE users SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
+  db.query(query, [name, req.userId], (err, result) => {
+    if (err) {
+      console.error("[PUT /api/user] DB error:", err.message);
+      return res.status(500).json({ success: false, message: "ไม่สามารถบันทึกได้" });
+    }
+    if (result.affectedRows === 0) {
+      console.warn("[PUT /api/user] ไม่พบ user id:", req.userId);
+      return res.status(404).json({ success: false, message: "ไม่พบบัญชีผู้ใช้" });
+    }
+    console.log("[PUT /api/user] บันทึกชื่อเล่นสำเร็จ userId:", req.userId, "username:", name);
+    res.status(200).json({ success: true, message: "บันทึกชื่อเล่นเรียบร้อยแล้ว", username: name });
   });
 });
 
