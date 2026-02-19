@@ -4,6 +4,5 @@
  * - เครื่องจริง: "http://<IP คอมคุณ>:500" (เช่น http://192.168.1.35:500)
  * - Cloudflare Tunnel: ใช้ URL จาก cloudflared (เช่น https://xxx.trycloudflare.com)
  */
-// Quick Tunnel (ชั่วคราว): https://xxx.trycloudflare.com
-// Named Tunnel (โดเมนคุณ): ใส่ hostname ที่ตั้งใน Cloudflare Tunnel
-export const BASE_URL = "https://civilian-notre-subsequently-clothing.trycloudflare.com";
+// Cloudflare Tunnel โดเมน
+export const BASE_URL = "https://can-reservations-eos-guidance.trycloudflare.com";
