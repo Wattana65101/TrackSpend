@@ -215,7 +215,11 @@ export default function RegisterScreen({ navigation }) {
         setLoading(false);
         return;
       }
-      const { idToken } = await GoogleSignin.getTokens();
+      let idToken = signInResult.data?.idToken;
+      if (!idToken) {
+        const tokens = await GoogleSignin.getTokens();
+        idToken = tokens?.idToken;
+      }
       if (!idToken) {
         Alert.alert("❌ ล้มเหลว", "ไม่สามารถดึงข้อมูลจาก Google ได้");
         setLoading(false);

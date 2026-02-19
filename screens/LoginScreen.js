@@ -107,7 +107,12 @@ export default function LoginScreen({ navigation }) {
         setLoading(false);
         return;
       }
-      const { idToken } = await GoogleSignin.getTokens();
+      // ใช้ idToken จากผล signIn ก่อน (โทเคนใหม่) ถ้าไม่มีค่อยดึงจาก getTokens()
+      let idToken = signInResult.data?.idToken;
+      if (!idToken) {
+        const tokens = await GoogleSignin.getTokens();
+        idToken = tokens?.idToken;
+      }
       if (!idToken) {
         Alert.alert("❌ ล้มเหลว", "ไม่สามารถดึงข้อมูลจาก Google ได้");
         setLoading(false);

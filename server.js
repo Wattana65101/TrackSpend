@@ -346,12 +346,16 @@ app.post("/api/auth/google", async (req, res) => {
     const resp = await fetch(url);
     const payload = await resp.json();
     if (payload.error) {
+      const msg = payload.error_description || payload.error || "โทเคน Google ไม่ถูกต้อง";
       console.warn("Google tokeninfo error:", payload.error, "description:", payload.error_description);
-      return res.status(401).json({ success: false, message: "โทเคน Google ไม่ถูกต้อง" });
+      return res.status(401).json({ success: false, message: msg });
     }
     if (!isAudienceValid(payload.aud)) {
       console.warn("Google token aud ไม่ตรง:", "aud=", payload.aud, "รอ:", GOOGLE_CLIENT_IDS);
-      return res.status(401).json({ success: false, message: "โทเคน Google ไม่ถูกต้อง" });
+      return res.status(401).json({
+        success: false,
+        message: "Client ID ไม่ตรงกับเซิร์ฟเวอร์ (ลองออกจากแอปแล้วล็อกอิน Google ใหม่)",
+      });
     }
     const email = payload.email;
     const name = (payload.name || email).trim() || "User";
