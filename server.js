@@ -19,6 +19,7 @@ try {
 const useGmail = !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 
 const app = express();
+app.set("etag", false); // ป้องกัน 304 Not Modified — ให้ API ส่ง 200 พร้อมข้อมูลล่าสุดทุกครั้ง
 const port = process.env.SERVER_PORT || 500;
 // ⚠️ หมายเหตุ: ควรใช้ environment variable สำหรับ production
 // ตัวอย่าง: process.env.JWT_SECRET_KEY || "your_very_secret_key"
@@ -31,6 +32,13 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// API ไม่ cache — เปลี่ยนชื่อเล่น/ข้อมูลแล้วให้ได้ค่าล่าสุด
+app.use("/api", (req, res, next) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.set("Pragma", "no-cache");
+  next();
+});
 
 // Request log (method, path, status)
 app.use((req, res, next) => {
@@ -529,22 +537,29 @@ app.get("/api/user", verifyToken, (req, res) => {
 
 // ✅ Update user profile (username)
 app.put("/api/user", verifyToken, (req, res) => {
-  const { username: newUsername } = req.body;
+  if (db.state === "disconnected") {
+    console.error("[PUT /api/user] DB disconnected");
+    return res.status(503).json({ success: false, message: "ไม่สามารถเชื่อมต่อฐานข้อมูลได้" });
+  }
+  const userId = req.userId;
+  const newUsername = req.body && req.body.username;
+  console.log("[PUT /api/user] request userId:", userId, "body.username:", newUsername);
   if (!newUsername || typeof newUsername !== "string" || !newUsername.trim()) {
     return res.status(400).json({ success: false, message: "กรุณากรอกชื่อเล่น" });
   }
   const name = newUsername.trim().substring(0, 50);
   const query = "UPDATE users SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?";
-  db.query(query, [name, req.userId], (err, result) => {
+  db.query(query, [name, userId], (err, result) => {
     if (err) {
       console.error("[PUT /api/user] DB error:", err.message);
       return res.status(500).json({ success: false, message: "ไม่สามารถบันทึกได้" });
     }
+    console.log("[PUT /api/user] UPDATE result affectedRows:", result.affectedRows, "changedRows:", result.changedRows);
     if (result.affectedRows === 0) {
-      console.warn("[PUT /api/user] ไม่พบ user id:", req.userId);
+      console.warn("[PUT /api/user] ไม่พบ user id:", userId);
       return res.status(404).json({ success: false, message: "ไม่พบบัญชีผู้ใช้" });
     }
-    console.log("[PUT /api/user] บันทึกชื่อเล่นสำเร็จ userId:", req.userId, "username:", name);
+    console.log("[PUT /api/user] บันทึกชื่อเล่นสำเร็จ userId:", userId, "username:", name);
     res.status(200).json({ success: true, message: "บันทึกชื่อเล่นเรียบร้อยแล้ว", username: name });
   });
 });

@@ -317,7 +317,7 @@ export default function BudgetScreen() {
     >
       <View style={styles.header}>
         <View>
-          <Text style={[headingPage(colors), styles.titleLayout]}>เป้าหมายการจ่ายใช้</Text>
+          <Text style={[headingPage(colors), styles.titleLayout]}>หน้างบประมาณ</Text>
           <Text style={subtitle(colors)}>
             {budgets.length} งบประมาณ
           </Text>
