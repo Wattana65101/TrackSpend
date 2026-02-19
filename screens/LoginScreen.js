@@ -101,15 +101,29 @@ export default function LoginScreen({ navigation }) {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      await GoogleSignin.hasPlayServices();
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const signInResult = await GoogleSignin.signIn();
       if (signInResult?.type !== "success" || !signInResult?.data) {
+        if (signInResult?.type === "cancelled") {
+          // ผู้ใช้กดยกเลิก ไม่ต้องแสดง error
+        } else if (__DEV__ && signInResult) {
+          console.warn("Google signIn result:", signInResult?.type, signInResult);
+        }
         setLoading(false);
         return;
       }
-      const { idToken } = await GoogleSignin.getTokens();
+      // ใช้ idToken จากผล sign-in ก่อน (fresh) ถ้าไม่มีค่อยเรียก getTokens()
+      let idToken = signInResult.data?.idToken ?? null;
       if (!idToken) {
-        Alert.alert("❌ ล้มเหลว", "ไม่สามารถดึงข้อมูลจาก Google ได้");
+        try {
+          const tokens = await GoogleSignin.getTokens();
+          idToken = tokens?.idToken ?? null;
+        } catch (e) {
+          if (__DEV__) console.warn("getTokens error:", e);
+        }
+      }
+      if (!idToken) {
+        Alert.alert("❌ ล้มเหลว", "ไม่สามารถดึง idToken จาก Google ได้ (ตรวจสอบ SHA-1 ใน Google Cloud Console สำหรับ Android)");
         setLoading(false);
         return;
       }
@@ -147,7 +161,14 @@ export default function LoginScreen({ navigation }) {
       }
     } catch (error) {
       console.error("Google login error:", error);
-      Alert.alert("Error", "เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google");
+      const msg = error?.message || "";
+      const isNetwork = msg.includes("Network") || msg.includes("fetch") || msg.includes("Failed to fetch");
+      Alert.alert(
+        "Error",
+        isNetwork
+          ? "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ ตรวจสอบ BASE_URL และให้แน่ใจว่า backend/tunnel ทำงานอยู่"
+          : (error?.message || "เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google")
+      );
     } finally {
       setLoading(false);
     }
@@ -228,15 +249,21 @@ export default function LoginScreen({ navigation }) {
 
       {/* Bottom Section - White (60%) */}
       <View style={styles.bottomSection}>
-        <Animated.View
-          style={[
-            styles.formContainer,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
+        <ScrollView
+          style={styles.formScroll}
+          contentContainerStyle={styles.formScrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
+          <Animated.View
+            style={[
+              styles.formContainer,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
           {/* Email Input */}
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
@@ -350,16 +377,18 @@ export default function LoginScreen({ navigation }) {
             </View>
           </TouchableOpacity>
 
-          {/* Create Account Link */}
+          {/* Create Account Link - ไปหน้าสมัครสมาชิก */}
           <View style={styles.registerLinkContainer}>
             <TouchableOpacity
               onPress={() => navigation.navigate("Register")}
               activeOpacity={0.7}
             >
               <Text style={styles.createAccountText}>CREATE ACCOUNT</Text>
+              <Text style={styles.createAccountSubtext}>สมัครสมาชิก</Text>
             </TouchableOpacity>
           </View>
-        </Animated.View>
+          </Animated.View>
+        </ScrollView>
       </View>
 
       <Modal
@@ -494,8 +523,14 @@ const styles = StyleSheet.create({
     shadowRadius: 50,
     elevation: 10,
   },
-  formContainer: {
+  formScroll: {
     flex: 1,
+  },
+  formScrollContent: {
+    paddingBottom: 32,
+    flexGrow: 1,
+  },
+  formContainer: {
     paddingTop: 0,
   },
   inputGroup: {
@@ -591,6 +626,13 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
     letterSpacing: 3,
     textTransform: "uppercase",
+  },
+  createAccountSubtext: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#059669",
+    marginTop: 2,
+    textAlign: "center",
   },
   modalOverlay: {
     flex: 1,
