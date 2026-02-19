@@ -5,6 +5,7 @@
   "scripts": {
     "postinstall": "patch-package",
     "android": "react-native run-android",
+    "android:device": "react-native run-android --deviceId=dd3c9555",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
