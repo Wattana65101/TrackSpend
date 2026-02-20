@@ -63,6 +63,8 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0,
+  enableKeepAlive: true,   // ลดโอกาส connection ถูกตัดเมื่อ idle
+  keepAliveInitialDelay: 10000,
 };
 const db = mysql.createPool(dbConfig);
 
@@ -99,6 +101,21 @@ db.getConnection((err, conn) => {
 db.on("error", (err) => {
   console.warn("⚠️ MySQL pool error (connection อาจหลุด):", err.message);
 });
+
+// Query พร้อม retry ครั้งเดียวเมื่อ connection หลุด (closed state)
+function poolQuery(sql, params, callback) {
+  if (typeof params === "function") {
+    callback = params;
+    params = [];
+  }
+  db.query(sql, params, (err, results) => {
+    if (err && (err.message || "").includes("closed state")) {
+      console.warn("[DB] connection closed state, retrying query once");
+      return db.query(sql, params, callback);
+    }
+    callback(err, results);
+  });
+}
 
 // JWT verify middleware
 const verifyToken = (req, res, next) => {
@@ -395,7 +412,7 @@ app.post("/api/auth/google", async (req, res) => {
     const name = (payload.name || email).trim() || "User";
 
     const findQuery = "SELECT id, username, phone FROM users WHERE email = ?";
-    db.query(findQuery, [email], (err, results) => {
+    poolQuery(findQuery, [email], (err, results) => {
       if (err) {
         console.error("[Google Login] DB error:", err.message);
         return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์" });
@@ -427,12 +444,12 @@ app.post("/api/auth/google", async (req, res) => {
       const username = (reqUsername && String(reqUsername).trim()) ? String(reqUsername).trim().substring(0, 50) : name.substring(0, 50);
       const hashedPassword = bcrypt.hashSync("google-" + email + "-" + Date.now(), 8);
       const insertQuery = "INSERT INTO users (username, phone, email, password) VALUES (?, ?, ?, ?)";
-      db.query(insertQuery, [username, phoneDigits, email, hashedPassword], (err2, insertResult) => {
+      poolQuery(insertQuery, [username, phoneDigits, email, hashedPassword], (err2, insertResult) => {
         if (err2) {
           console.error("[Google Login] DB insert error:", err2.message);
           return res.status(500).json({ success: false, message: "ไม่สามารถสร้างบัญชีได้" });
         }
-        db.query("SELECT id, username, phone FROM users WHERE email = ?", [email], (err3, rows) => {
+        poolQuery("SELECT id, username, phone FROM users WHERE email = ?", [email], (err3, rows) => {
           if (err3 || !rows?.length) {
             console.error("[Google Login] DB select หลัง insert error:", err3?.message);
             return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดหลังสร้างบัญชี" });
