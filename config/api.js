@@ -6,3 +6,4 @@
  */
 // Quick Tunnel (API พอร์ต 500): รัน cloudflared tunnel --url http://localhost:500
 export const BASE_URL = "https://can-reservations-eos-guidance.trycloudflare.com";
+//http://45:9C:2C:47:D0:EE:9E:68:35:CB:C6:49:58:1A:46:12:EA:45:D7:0B:5000
