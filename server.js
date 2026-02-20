@@ -171,7 +171,8 @@ app.post("/api/login", (req, res) => {
   const query = "SELECT * FROM users WHERE email = ?";
   db.query(query, [email], (err, results) => {
     if (err) {
-      console.error("❌ DB error:", err);
+      console.error("❌ Login DB error:", err.message);
+      console.error("   SQL:", query, "params:", [email]);
       return res.status(500).json({ success: false, message: "เกิดข้อผิดพลาดจากเซิร์ฟเวอร์" });
     }
     if (results.length === 0) {
