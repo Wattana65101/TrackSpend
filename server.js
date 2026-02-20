@@ -52,24 +52,28 @@ app.use((req, res, next) => {
   next();
 });
 
-// DB connection
-// ⚠️ หมายเหตุ: ควรใช้ environment variables สำหรับ production
+// DB connection — ใช้ pool เพื่อรองรับเมื่อ connection หลุด (reconnect อัตโนมัติ)
 // สำหรับ Docker: DB_HOST=localhost, DB_PORT=3308
-// สำหรับ MySQL แบบปกติ: DB_HOST=127.0.0.1, DB_PORT=3306
-const db = mysql.createConnection({
+const dbConfig = {
   host: process.env.DB_HOST || "localhost",
-  port: process.env.DB_PORT || 3308, // Docker ใช้ 3308, MySQL ปกติใช้ 3306
+  port: parseInt(process.env.DB_PORT || "3308", 10),
   user: process.env.DB_USER || "trackspend_user",
-  password: process.env.DB_PASSWORD || "trackspend_pass", // ⚠️ เปลี่ยนใน production
+  password: process.env.DB_PASSWORD || "trackspend_pass",
   database: process.env.DB_NAME || "trackspend",
-});
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+};
+const db = mysql.createPool(dbConfig);
 
-db.connect((err) => {
+// ตรวจสอบการเชื่อมต่อและสร้างตารางเมื่อพร้อม
+db.getConnection((err, conn) => {
   if (err) {
-    console.error("❌ Error connecting to MySQL:", err);
+    console.error("❌ Error connecting to MySQL:", err.message);
     return;
   }
   console.log("✅ Connected to MySQL database!");
+  conn.release();
   if (useGmail) {
     if ((process.env.GMAIL_USER || "").includes("your.email")) {
       console.log("⚠️ GMAIL_USER ยังเป็น placeholder - เปลี่ยนเป็นอีเมล Gmail จริงใน .env");
@@ -78,7 +82,6 @@ db.connect((err) => {
     }
   } else if (resend) console.log("📧 ส่งอีเมล: Resend พร้อมใช้งาน");
   else console.log("⚠️ ส่งอีเมล: โหมด dev (ดูรหัสที่ terminal)");
-  // สร้างตาราง password_reset_tokens ถ้ายังไม่มี
   db.query(`
     CREATE TABLE IF NOT EXISTS password_reset_tokens (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -91,6 +94,10 @@ db.connect((err) => {
       INDEX idx_expires (expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `, (e) => { if (e) console.warn("⚠️ password_reset_tokens table:", e.message); });
+});
+
+db.on("error", (err) => {
+  console.warn("⚠️ MySQL pool error (connection อาจหลุด):", err.message);
 });
 
 // JWT verify middleware
@@ -125,15 +132,6 @@ app.post("/api/register", (req, res) => {
     phone: req.body.phone,
     hasPassword: !!req.body.password
   });
-  
-  // ตรวจสอบว่า database connected หรือไม่
-  if (db.state === "disconnected") {
-    console.error("❌ Database is disconnected!");
-    return res.status(503).json({ 
-      success: false, 
-      message: "ไม่สามารถเชื่อมต่อกับฐานข้อมูลได้ กรุณาตรวจสอบการตั้งค่า MySQL" 
-    });
-  }
 
   const { username, phone, email, password } = req.body;
 
@@ -538,10 +536,6 @@ app.get("/api/user", verifyToken, (req, res) => {
 
 // ✅ Update user profile (username)
 app.put("/api/user", verifyToken, (req, res) => {
-  if (db.state === "disconnected") {
-    console.error("[PUT /api/user] DB disconnected");
-    return res.status(503).json({ success: false, message: "ไม่สามารถเชื่อมต่อฐานข้อมูลได้" });
-  }
   const userId = req.userId;
   const newUsername = req.body && req.body.username;
   console.log("[PUT /api/user] request userId:", userId, "body.username:", newUsername);
