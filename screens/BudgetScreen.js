@@ -14,6 +14,25 @@ import {
 import { AppContext, expenseCategories } from "./AppContext";
 import { headingPage, subtitle } from "../config/styles";
 import Ionicons from "react-native-vector-icons/Ionicons";
+
+const THAI_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+
+function useMonthOptions() {
+  return useMemo(() => {
+    const now = new Date();
+    const monthCount = 6;
+    const months = [];
+    const monthKeys = [];
+    for (let i = 0; i < monthCount; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const y = d.getFullYear() + 543;
+      const shortYear = String(y).slice(-2);
+      months.push(THAI_MONTHS[d.getMonth()] + " " + shortYear);
+      monthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    }
+    return { months, monthKeys };
+  }, []);
+}
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 const ProgressBar = ({ progress, colors, hexToRgbA }) => {
@@ -157,6 +176,7 @@ export default function BudgetScreen() {
   const insets = useSafeAreaInsets();
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState(0);
 
   const [editingBudget, setEditingBudget] = useState(null);
   const [editLimit, setEditLimit] = useState("");
@@ -168,18 +188,25 @@ export default function BudgetScreen() {
 
   const [loading, setLoading] = useState(false);
 
+  const { months, monthKeys } = useMonthOptions();
+
   const budgetsWithSpent = useMemo(() => {
+    if (!monthKeys || selectedMonthIndex == null) return budgets.map((b) => ({ ...b, spent: 0, icon: "pie-chart-outline" }));
+    const key = monthKeys[selectedMonthIndex];
     return budgets.map((budget) => {
       const spent = transactions
-        .filter(
-          (t) => t.type === "expense" && t.category === budget.category
-        )
+        .filter((t) => {
+          if (t.type !== "expense" || t.category !== budget.category || !t.date) return false;
+          const tDate = new Date(t.date);
+          const tKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, "0")}`;
+          return tKey === key;
+        })
         .reduce((sum, t) => sum + Number(t.amount || 0), 0);
       const categoryInfo = expenseCategories.find((c) => c.name === budget.category);
       const icon = categoryInfo?.icon || "pie-chart-outline";
       return { ...budget, spent, icon };
     });
-  }, [budgets, transactions]);
+  }, [budgets, transactions, selectedMonthIndex, monthKeys]);
 
   const handleAddNewBudget = async () => {
     if (
@@ -319,7 +346,7 @@ export default function BudgetScreen() {
         <View>
           <Text style={[headingPage(colors), styles.titleLayout]}>หน้างบประมาณ</Text>
           <Text style={subtitle(colors)}>
-            {budgets.length} งบประมาณ
+            {budgets.length} งบประมาณ ({months[selectedMonthIndex]})
           </Text>
         </View>
         <TouchableOpacity
@@ -330,6 +357,49 @@ export default function BudgetScreen() {
           <Ionicons name="add" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
+
+      {/* เลือกเดือน - แสดง 4 เดือนแล้วเลื่อนดูต่อ */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={true}
+        contentContainerStyle={[
+          styles.monthSelectorRow,
+          {
+            paddingHorizontal: 20,
+            marginBottom: 12,
+            paddingRight: 20,
+          },
+        ]}
+      >
+        {months.map((label, index) => (
+          <TouchableOpacity
+            key={index}
+            onPress={() => setSelectedMonthIndex(index)}
+            style={[
+              styles.monthChip,
+              {
+                backgroundColor: selectedMonthIndex === index
+                  ? hexToRgbA(colors.primary, 0.15)
+                  : hexToRgbA(colors.subtext, 0.1),
+                borderColor: selectedMonthIndex === index ? hexToRgbA(colors.primary, 0.5) : "transparent",
+              },
+            ]}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.monthChipText,
+                {
+                  color: selectedMonthIndex === index ? colors.primary : colors.text,
+                  fontWeight: "600",
+                },
+              ]}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
       {budgetsWithSpent.length > 0 ? (
         <FlatList
@@ -616,6 +686,23 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   titleLayout: { marginBottom: 4 },
+  monthSelectorRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  monthChip: {
+    height: 38,
+    minWidth: 76,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  monthChipText: {
+    fontSize: 13,
+  },
   addButton: {
     width: 52,
     height: 52,

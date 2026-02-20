@@ -31,7 +31,7 @@ export default function HomeScreen() {
   const chartIncomeLineColor = colors?.chartIncome || colors?.income;
   const chartExpenseLineColor = colors?.chartExpense || colors?.expense;
 
-  // ✅ datasets สรุปรายสัปดาห์ (7 วัน)
+  // ✅ datasets สรุปรายสัปดาห์ (7 วันที่ผ่านมา - แต่ละจุด = ยอดของวันนั้น)
   const weeklyData = useMemo(() => {
     if (!transactions) {
       return {
@@ -42,26 +42,37 @@ export default function HomeScreen() {
         ],
       };
     }
-    const days = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+    const now = new Date();
     const incomeTotals = new Array(7).fill(0);
     const expenseTotals = new Array(7).fill(0);
+    const labels = [];
 
-    transactions.forEach((t) => {
-      if (t.date) {
-        const day = new Date(t.date).getDay();
-        const amt = parseFloat(t.amount);
-        if (!isNaN(amt)) {
-          if (t.type === "income") {
-            incomeTotals[day] += amt;
-          } else if (t.type === "expense") {
-            expenseTotals[day] += amt;
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      d.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(d);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      const dayNames = ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"];
+      const idx = 6 - i;
+      labels.push(dayNames[d.getDay()] + " " + d.getDate());
+
+      transactions.forEach((t) => {
+        if (!t.date) return;
+        const tDate = new Date(t.date);
+        if (tDate >= d && tDate <= dayEnd) {
+          const amt = parseFloat(t.amount);
+          if (!isNaN(amt)) {
+            if (t.type === "income") incomeTotals[idx] += amt;
+            else if (t.type === "expense") expenseTotals[idx] += amt;
           }
         }
-      }
-    });
+      });
+    }
 
     return {
-      labels: days,
+      labels,
       datasets: [
         { data: incomeTotals, color: () => chartIncomeLineColor },
         { data: expenseTotals, color: () => chartExpenseLineColor },
@@ -133,15 +144,20 @@ export default function HomeScreen() {
   const chartWidth = timeRange === "week" ? screenWidth - 48 : Math.max(screenWidth - 80, chartData.labels.length * 70);
   const chartHeight = 200;
 
+  // ใช้ padding ตรงกับ react-native-chart-kit (style default)
+  const CHART_PADDING_TOP = 16;
+  const CHART_PADDING_RIGHT_KIT = 64;
+
   const showTooltipAtChartPosition = useCallback(
-    (chartX, chartY) => {
+    (chartX) => {
       if (!chartData.labels.length) return;
       const dataStartX = CHART_PADDING_LEFT;
       const dataEndX = chartWidth - CHART_PADDING_RIGHT;
       const dataWidth = dataEndX - dataStartX;
       if (dataWidth <= 0) return;
       const clampedX = Math.max(dataStartX, Math.min(dataEndX, chartX));
-      const rawIndex = ((clampedX - dataStartX) / dataWidth) * (chartData.labels.length - 1);
+      const xMax = Math.max(1, chartData.labels.length - 1);
+      const rawIndex = ((clampedX - dataStartX) / dataWidth) * xMax;
       const index = Math.max(0, Math.min(chartData.labels.length - 1, Math.round(rawIndex)));
       const label = chartData.labels[index];
       const income = chartData.datasets[0]?.data[index] ?? 0;
@@ -150,10 +166,8 @@ export default function HomeScreen() {
       let dateLabel = "";
       const now = new Date();
       if (timeRange === "week") {
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay());
-        const d = new Date(startOfWeek);
-        d.setDate(startOfWeek.getDate() + index);
+        const d = new Date(now);
+        d.setDate(now.getDate() - (6 - index));
         const day = d.getDate();
         const month = d.getMonth();
         const year = d.getFullYear() + 543;
@@ -167,7 +181,17 @@ export default function HomeScreen() {
         dateLabel = `${monthsShort[monthIndex]} ${yearBe}`;
       }
 
-      setChartTooltip({ label, income, expense, x: chartX, y: chartY, dateLabel });
+      // ลูกกลมล็อกตามเส้นกราฟ - คำนวณ X,Y จากข้อมูล (ตรงกับ chart-kit)
+      const xMaxKit = Math.max(1, chartData.labels.length);
+      const dotX = CHART_PADDING_RIGHT_KIT + (index * (chartWidth - CHART_PADDING_RIGHT_KIT)) / xMaxKit;
+      const allData = [...(chartData.datasets[0]?.data || []), ...(chartData.datasets[1]?.data || [])];
+      const maxVal = Math.max(0, ...allData, 1);
+      const val = Math.max(income, expense, 0);
+      const baseHeight = chartHeight;
+      const calcHeight = (v) => chartHeight * (v / maxVal);
+      const dotY = ((baseHeight - calcHeight(val)) / 4) * 3 + CHART_PADDING_TOP;
+
+      setChartTooltip({ label, income, expense, x: dotX, y: dotY, dateLabel });
     },
     [chartData, chartWidth, timeRange]
   );
@@ -178,12 +202,10 @@ export default function HomeScreen() {
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,
         onPanResponderGrant: (evt) => {
-          const { locationX, locationY } = evt.nativeEvent;
-          showTooltipAtChartPosition(locationX, locationY);
+          showTooltipAtChartPosition(evt.nativeEvent.locationX);
         },
         onPanResponderMove: (evt) => {
-          const { locationX, locationY } = evt.nativeEvent;
-          showTooltipAtChartPosition(locationX, locationY);
+          showTooltipAtChartPosition(evt.nativeEvent.locationX);
         },
         onPanResponderRelease: () => setChartTooltip(null),
         onPanResponderTerminate: () => setChartTooltip(null),
@@ -436,6 +458,31 @@ export default function HomeScreen() {
         {/* Chart with Legend */}
         {chartData.labels.length > 0 && (
           <>
+            {/* Summary Stats - ข้อมูลลูกกลมๆ อยู่ข้างบน ไม่บังกราฟ */}
+            <View style={styles.chartSummary}>
+              <View style={styles.chartSummaryItem}>
+                <View style={[styles.chartSummaryDot, { backgroundColor: chartIncomeLineColor }]} />
+                <View style={styles.chartSummaryContent}>
+                  <Text style={[styles.chartSummaryLabel, { color: colors?.subtext }]} numberOfLines={1} {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>รายรับรวม</Text>
+                  <View style={{ flexShrink: 0, minWidth: 0 }}>
+                    <Text style={[styles.chartSummaryValue, { color: chartIncomeLineColor }]} numberOfLines={1} adjustsFontSizeToFit {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>
+                      ฿{chartData.datasets[0]?.data.reduce((a, b) => a + b, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || "0"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.chartSummaryItem}>
+                <View style={[styles.chartSummaryDot, { backgroundColor: chartExpenseLineColor }]} />
+                <View style={styles.chartSummaryContent}>
+                  <Text style={[styles.chartSummaryLabel, { color: colors?.subtext }]} numberOfLines={1} {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>รายจ่ายรวม</Text>
+                  <View style={{ flexShrink: 0, minWidth: 0 }}>
+                    <Text style={[styles.chartSummaryValue, { color: chartExpenseLineColor }]} numberOfLines={1} adjustsFontSizeToFit {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>
+                      ฿{chartData.datasets[1]?.data.reduce((a, b) => a + b, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || "0"}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
             <View style={styles.chartLegend}>
               <View style={styles.legendItem}>
                 <View style={[styles.legendDot, { backgroundColor: chartIncomeLineColor }]} />
@@ -448,31 +495,6 @@ export default function HomeScreen() {
               <Text style={[styles.legendHint, { color: colors?.subtext }]} numberOfLines={1}>
                 กดค้างบนกราฟเพื่อดูรายละเอียด
               </Text>
-            </View>
-            {/* Summary Stats - พื้นหลังขาวเทาอ่อนทุกธีม */}
-            <View style={styles.chartSummary}>
-              <View style={styles.chartSummaryItem}>
-                <View style={[styles.chartSummaryDot, { backgroundColor: chartIncomeLineColor }]} />
-                  <View style={styles.chartSummaryContent}>
-                  <Text style={[styles.chartSummaryLabel, { color: colors?.subtext }]} numberOfLines={1} {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>รายรับรวม</Text>
-                  <View style={{ flexShrink: 0, minWidth: 0 }}>
-                    <Text style={[styles.chartSummaryValue, { color: chartIncomeLineColor }]} numberOfLines={1} adjustsFontSizeToFit {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>
-                      ฿{chartData.datasets[0]?.data.reduce((a, b) => a + b, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || "0"}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.chartSummaryItem}>
-                <View style={[styles.chartSummaryDot, { backgroundColor: chartExpenseLineColor }]} />
-                  <View style={styles.chartSummaryContent}>
-                  <Text style={[styles.chartSummaryLabel, { color: colors?.subtext }]} numberOfLines={1} {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>รายจ่ายรวม</Text>
-                  <View style={{ flexShrink: 0, minWidth: 0 }}>
-                    <Text style={[styles.chartSummaryValue, { color: chartExpenseLineColor }]} numberOfLines={1} adjustsFontSizeToFit {...(Platform.OS === "android" && { textBreakStrategy: "simple" })}>
-                      ฿{chartData.datasets[1]?.data.reduce((a, b) => a + b, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || "0"}
-                    </Text>
-                  </View>
-                </View>
-              </View>
             </View>
             
             {/* สัปดาห์ = AREA อยู่หน้าเดียว | เดือน = LINE เลื่อนดูได้ | กราฟไม่แย่ง touch (pointerEvents="none") */}
@@ -551,6 +573,7 @@ export default function HomeScreen() {
                       ]}
                       pointerEvents="none"
                     />
+                    {/* แถบข้อมูลขยับตามลูกกลม - อยู่เหนือจุดบนเส้น */}
                     <View
                       style={[
                         styles.chartTooltipBox,

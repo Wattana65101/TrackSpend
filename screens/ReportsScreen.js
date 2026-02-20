@@ -300,6 +300,38 @@ export default function ReportsScreen() {
       });
   }, [transactions, selectedMonthIndex, monthlyChartData.monthKeys]);
 
+  // แผนภูมิรายจ่ายตามหมวดหมู่ - กรองตามเดือนที่เลือก
+  const budgetChartDataForDisplay = useMemo(() => {
+    if (!budgets || !budgets.length) return [];
+    const txns = selectedMonthIndex != null && monthlyChartData.monthKeys
+      ? (() => {
+          const key = monthlyChartData.monthKeys[selectedMonthIndex];
+          return (transactions || []).filter((t) => {
+            if (!t.date) return false;
+            const tDate = new Date(t.date);
+            const tKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, "0")}`;
+            return tKey === key;
+          });
+        })()
+      : (transactions || []);
+    return budgets.map((budget, index) => {
+      const spent = txns
+        .filter((t) => t.type === "expense" && t.category === budget.category)
+        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+      const limit = Number(budget.limit) || 0;
+      const percentUsed = limit > 0 ? Math.min(100, Math.round((spent / limit) * 100)) : 0;
+      const catIndex = expenseCategories.findIndex((c) => c.name === budget.category);
+      const color = CATEGORY_COLORS[catIndex >= 0 ? catIndex % CATEGORY_COLORS.length : index % CATEGORY_COLORS.length];
+      return {
+        name: budget.category,
+        amount: spent,
+        limit,
+        percentUsed,
+        color,
+      };
+    });
+  }, [transactions, budgets, selectedMonthIndex, monthlyChartData.monthKeys]);
+
   const topExpenseCategoryInSelectedMonth = useMemo(() => {
     const expenses = (transactionsForSelectedMonth || []).filter((t) => t.type === "expense");
     if (expenses.length === 0) return null;
@@ -573,8 +605,8 @@ export default function ReportsScreen() {
         )}
       </View>
 
-      {/* ApexCharts RadialBar ใช้ไปเทียบงบ - แสดงเฉพาะหมวดที่มีการใช้จ่าย */}
-      {budgetChartData.length > 0 && (
+      {/* ApexCharts RadialBar ใช้ไปเทียบงบ - แสดงเฉพาะหมวดที่มีการใช้จ่าย (กรองตามเดือนที่เลือก) */}
+      {budgetChartDataForDisplay.length > 0 && (
         <View
           style={[
             styles.card,
@@ -597,10 +629,10 @@ export default function ReportsScreen() {
               แผนภูมิรายจ่ายตามหมวดหมู่
             </Text>
           </View>
-          {budgetChartData.filter((b) => Number(b.amount) > 0).length > 0 ? (
+          {budgetChartDataForDisplay.filter((b) => Number(b.amount) > 0).length > 0 ? (
             <View style={[styles.apexChartWrap, { height: 320 }]}>
               <WebView
-                source={{ html: getApexRadialBarHtml(budgetChartData.filter((b) => Number(b.amount) > 0), screenWidth - 80, 280) }}
+                source={{ html: getApexRadialBarHtml(budgetChartDataForDisplay.filter((b) => Number(b.amount) > 0), screenWidth - 80, 280) }}
                 style={{ backgroundColor: "transparent" }}
                 scrollEnabled={false}
                 originWhitelist={["*"]}
