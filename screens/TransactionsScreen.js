@@ -1,4 +1,4 @@
-import React, { useContext, useState } from "react";
+import React, { useContext, useState, useMemo } from "react";
 import {
   StyleSheet,
   Text,
@@ -7,17 +7,53 @@ import {
   TouchableOpacity,
   Modal,
   Platform,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppContext, expenseCategories, incomeCategories } from "./AppContext";
 import { headingSection, subtitle } from "../config/styles";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
+const THAI_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+
+function useMonthOptions() {
+  return useMemo(() => {
+    const now = new Date();
+    const monthCount = 6;
+    const months = [];
+    const monthKeys = [];
+    for (let i = 0; i < monthCount; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const y = d.getFullYear() + 543;
+      const shortYear = String(y).slice(-2);
+      months.push(THAI_MONTHS[d.getMonth()] + " " + shortYear);
+      monthKeys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    }
+    return { months, monthKeys };
+  }, []);
+}
+
 export default function TransactionsScreen() {
   const { transactions, deleteTransaction, colors, hexToRgbA } = useContext(AppContext);
   const [modalVisible, setModalVisible] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState(null);
+  const [selectedMonthIndex, setSelectedMonthIndex] = useState(0);
   const insets = useSafeAreaInsets();
+
+  const { months, monthKeys } = useMonthOptions();
+
+  const transactionsForMonth = useMemo(() => {
+    if (!transactions || !monthKeys || selectedMonthIndex == null) return [];
+    const key = monthKeys[selectedMonthIndex];
+    return transactions
+      .filter((t) => {
+        if (!t.date) return false;
+        const tDate = new Date(t.date);
+        const tKey = `${tDate.getFullYear()}-${String(tDate.getMonth() + 1).padStart(2, "0")}`;
+        return tKey === key;
+      })
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [transactions, selectedMonthIndex, monthKeys]);
 
   const confirmDelete = (id) => {
     setTransactionToDelete(id);
@@ -143,19 +179,58 @@ export default function TransactionsScreen() {
             รายการทั้งหมด
           </Text>
           <Text style={subtitle(colors)}>
-            {transactions?.length || 0} รายการ
+            {transactionsForMonth?.length || 0} รายการ ({months[selectedMonthIndex]})
           </Text>
         </View>
       </View>
 
-      {transactions && transactions.length > 0 ? (
+      {/* เลือกเดือน - แสดง 4 เดือนแล้วเลื่อนดูต่อ */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={true}
+        contentContainerStyle={[
+          styles.monthSelectorRow,
+          { marginHorizontal: 20, marginBottom: 12, paddingRight: 20 },
+        ]}
+      >
+        {months.map((label, index) => (
+          <TouchableOpacity
+            key={index}
+            onPress={() => setSelectedMonthIndex(index)}
+            style={[
+              styles.monthChip,
+              {
+                backgroundColor: selectedMonthIndex === index
+                  ? hexToRgbA(colors?.primary || "#059669", 0.15)
+                  : hexToRgbA(colors?.subtext || "#6B7280", 0.1),
+                borderColor: selectedMonthIndex === index ? hexToRgbA(colors?.primary || "#059669", 0.5) : "transparent",
+              },
+            ]}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.monthChipText,
+                {
+                  color: selectedMonthIndex === index ? (colors?.primary || "#059669") : colors?.text,
+                  fontWeight: "500",
+                },
+              ]}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {transactionsForMonth && transactionsForMonth.length > 0 ? (
         <FlatList
-          data={transactions}
+          data={transactionsForMonth}
           keyExtractor={(item, index) =>
             item && item.id != null ? String(item.id) : `txn-${index}`
           }
           renderItem={renderItem}
-          extraData={{ transactions, colors }}
+          extraData={{ transactionsForMonth, colors }}
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: (insets.bottom || 0) + 88 },
@@ -171,10 +246,10 @@ export default function TransactionsScreen() {
             style={{ opacity: 0.3 }}
           />
           <Text style={[styles.emptyText, { color: colors?.subtext }]}>
-            ยังไม่มีรายการ
+            ไม่มีรายการใน{months[selectedMonthIndex]}
           </Text>
           <Text style={[styles.emptySubText, { color: colors?.subtext }]}>
-            เพิ่มรายการแรกของคุณเลย!
+            เลือกเดือนอื่นหรือเพิ่มรายการใหม่
           </Text>
         </View>
       )}
@@ -248,6 +323,23 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   titleLayout: { marginBottom: 4 },
+  monthSelectorRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  monthChip: {
+    height: 38,
+    minWidth: 76,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  monthChipText: {
+    fontSize: 13,
+  },
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 100,
