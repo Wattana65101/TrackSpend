@@ -11,6 +11,7 @@ import {
   ScrollView,
   Alert,
   Dimensions,
+  Switch,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppContext, expenseCategories, incomeCategories } from "./AppContext";
@@ -90,6 +91,7 @@ export default function AddTransactionScreen() {
   const [note, setNote] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [modalMessage, setModalMessage] = useState("");
+  const [isRecurring, setIsRecurring] = useState(false); // จ่ายทุกเดือน
   const amountInputRef = useRef(null);
   const previousCategoryRef = useRef(null);
 
@@ -116,6 +118,7 @@ export default function AddTransactionScreen() {
       setSelectedCategory(null);
       setAmount("");
       setNote("");
+      setIsRecurring(false);
       previousCategoryRef.current = null;
       return () => {};
     }, [route.params?.type])
@@ -181,7 +184,31 @@ export default function AddTransactionScreen() {
       });
 
       if (response.ok) {
-        Alert.alert("✅ สำเร็จ", "บันทึกรายการเรียบร้อยแล้ว");
+        if (isRecurring && type === "expense") {
+          const dayOfMonth = new Date().getDate();
+          const recurringRes = await fetch(`${BASE_URL}/api/recurring-transactions`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              amount: transactionAmount,
+              type,
+              category: selectedCategory.name,
+              note,
+              day_of_month: dayOfMonth,
+            }),
+          });
+          if (!recurringRes.ok) {
+            // Transaction saved แต่ recurring อาจ fail - แจ้งผู้ใช้
+            Alert.alert("✅ บันทึกแล้ว", "รายการบันทึกแล้ว แต่การตั้งค่าจ่ายทุกเดือนอาจไม่สำเร็จ");
+          } else {
+            Alert.alert("✅ สำเร็จ", "บันทึกเรียบร้อย ระบบจะเพิ่มรายการนี้ให้อัตโนมัติทุกเดือน");
+          }
+        } else {
+          Alert.alert("✅ สำเร็จ", "บันทึกรายการเรียบร้อยแล้ว");
+        }
         fetchTransactionsAndBudgets();
         navigation.goBack();
       } else {
@@ -475,6 +502,35 @@ export default function AddTransactionScreen() {
             />
           </View>
 
+          {/* จ่ายทุกเดือน - แสดงเฉพาะรายจ่าย */}
+          {type === "expense" && selectedCategory && (
+            <View
+              style={[
+                styles.recurringSection,
+                { backgroundColor: colors.card, shadowColor: colors.text },
+              ]}
+            >
+              <View style={styles.recurringRow}>
+                <Ionicons name="calendar" size={20} color={colors.primary} />
+                <Text style={[styles.recurringLabel, { color: colors.text }]}>
+                  จ่ายทุกเดือน
+                </Text>
+                <View style={{ marginLeft: 8 }} />
+                <Switch
+                  value={isRecurring}
+                  onValueChange={setIsRecurring}
+                  trackColor={{ false: "#D1D5DB", true: hexToRgbA(colors.primary, 0.5) }}
+                  thumbColor={isRecurring ? colors.primary : "#F3F4F6"}
+                />
+              </View>
+              <Text style={[styles.recurringHint, { color: colors.subtext }]}>
+                {isRecurring
+                  ? "ระบบจะเพิ่มรายการนี้ให้อัตโนมัติในแต่ละเดือน"
+                  : "เปิดเพื่อให้ระบบเพิ่มรายการอัตโนมัติทุกเดือน"}
+              </Text>
+            </View>
+          )}
+
           {/* Save Button */}
           <TouchableOpacity
             style={[
@@ -733,6 +789,29 @@ const styles = StyleSheet.create({
   changeCategoryText: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  recurringSection: {
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 20,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  recurringRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  recurringLabel: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  recurringHint: {
+    fontSize: 12,
+    marginTop: 8,
+    marginLeft: 32,
   },
   noteSection: {
     borderRadius: 20,

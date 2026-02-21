@@ -96,6 +96,21 @@ db.getConnection((err, conn) => {
       INDEX idx_expires (expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `, (e) => { if (e) console.warn("⚠️ password_reset_tokens table:", e.message); });
+  db.query(`
+    CREATE TABLE IF NOT EXISTS recurring_transactions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      amount DECIMAL(10, 2) NOT NULL,
+      type ENUM('income', 'expense') NOT NULL,
+      category VARCHAR(100) NOT NULL,
+      note TEXT,
+      day_of_month TINYINT NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      INDEX idx_user_id (user_id),
+      INDEX idx_category (category)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `, (e) => { if (e) console.warn("⚠️ recurring_transactions table:", e.message); });
 });
 
 db.on("error", (err) => {
@@ -474,14 +489,55 @@ app.post("/api/auth/google", async (req, res) => {
   }
 });
 
+// Process recurring: สร้างรายการอัตโนมัติสำหรับเดือนปัจจุบันถ้ายังไม่มี
+function processRecurringTransactions(userId, callback) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-11
+  const firstDay = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const lastDayNum = new Date(year, month + 1, 0).getDate();
+
+  db.query(
+    "SELECT id, amount, type, category, note, day_of_month FROM recurring_transactions WHERE user_id = ?",
+    [userId],
+    (err, recurringList) => {
+      if (err || !recurringList || recurringList.length === 0) return callback();
+
+      db.query(
+        "SELECT id, category, type, date FROM transactions WHERE user_id = ? AND date >= ? AND date <= ?",
+        [userId, firstDay, `${year}-${String(month + 1).padStart(2, "0")}-${String(lastDayNum).padStart(2, "0")}`],
+        (err2, monthTx) => {
+          if (err2) return callback();
+          const exists = new Set(monthTx.map((t) => `${t.type}:${t.category}`));
+          const toInsert = recurringList.filter((r) => !exists.has(`${r.type}:${r.category}`));
+          if (toInsert.length === 0) return callback();
+
+          let done = 0;
+          toInsert.forEach((r) => {
+            const day = Math.min(r.day_of_month || 1, lastDayNum);
+            const date = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+            db.query(
+              "INSERT INTO transactions (user_id, amount, type, category, note, date) VALUES (?, ?, ?, ?, ?, ?)",
+              [userId, r.amount, r.type, r.category, r.note || "", date],
+              () => { if (++done >= toInsert.length) callback(); }
+            );
+          });
+        }
+      );
+    }
+  );
+}
+
 // ✅ Get transactions
 app.get("/api/transactions", verifyToken, (req, res) => {
-  const query =
-    "SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC, created_at DESC";
-  db.query(query, [req.userId], (err, results) => {
-    if (err)
-      return res.status(500).json({ success: false, message: "Error fetching transactions." });
-    res.status(200).json(results);
+  processRecurringTransactions(req.userId, () => {
+    const query =
+      "SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC, created_at DESC";
+    db.query(query, [req.userId], (err, results) => {
+      if (err)
+        return res.status(500).json({ success: false, message: "Error fetching transactions." });
+      res.status(200).json(results);
+    });
   });
 });
 
@@ -512,6 +568,30 @@ app.post("/api/transactions", verifyToken, (req, res) => {
       return res.status(500).json({ success: false, message: "Error adding transaction." });
     }
     res.status(201).json({ success: true, message: "Transaction added successfully!" });
+  });
+});
+
+// ✅ Add recurring transaction (จ่ายทุกเดือน)
+app.post("/api/recurring-transactions", verifyToken, (req, res) => {
+  let { amount, type, category, note, day_of_month } = req.body;
+  if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+    return res.status(400).json({ success: false, message: "จำนวนเงินไม่ถูกต้อง" });
+  }
+  if (!type || (type !== "income" && type !== "expense")) {
+    return res.status(400).json({ success: false, message: "ประเภทไม่ถูกต้อง" });
+  }
+  if (!category || category.trim() === "") {
+    return res.status(400).json({ success: false, message: "กรุณาเลือกหมวดหมู่" });
+  }
+  const day = Math.min(31, Math.max(1, parseInt(day_of_month, 10) || 1));
+  const query =
+    "INSERT INTO recurring_transactions (user_id, amount, type, category, note, day_of_month) VALUES (?, ?, ?, ?, ?, ?)";
+  db.query(query, [req.userId, parseFloat(amount), type, category.trim(), note || "", day], (err) => {
+    if (err) {
+      console.error("❌ Error adding recurring:", err);
+      return res.status(500).json({ success: false, message: "Error adding recurring transaction." });
+    }
+    res.status(201).json({ success: true, message: "Recurring transaction added!" });
   });
 });
 

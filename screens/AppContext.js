@@ -187,11 +187,13 @@ export const expenseCategories = [
   { name: "สุขภาพ", icon: "medkit" },
   { name: "การศึกษา", icon: "book" },
   { name: "ค่าสาธารณูปโภค", icon: "bulb" },
+  { name: "ค่าขยะ", icon: "trash" },
   { name: "เสื้อผ้า", icon: "shirt" },
   { name: "เครื่องสำอาง", icon: "sparkles" },
   { name: "สัตว์เลี้ยง", icon: "paw" },
   { name: "กีฬา", icon: "football" },
   { name: "ของขวัญ", icon: "gift" },
+  { name: "ลอตตาลี่", icon: "ticket" },
   { name: "อื่น ๆ", icon: "ellipsis-horizontal-circle" },
 ];
 
