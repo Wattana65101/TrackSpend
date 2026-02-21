@@ -5,5 +5,5 @@
  * - Emulator: "http://10.0.2.2:500"
  */
 // Quick Tunnel (API พอร์ต 500): รัน cloudflared tunnel --url http://localhost:500
-export const BASE_URL = "https://antiques-survivor-asthma-happened.trycloudflare.com";
-//http://45:9C:2C:47:D0:EE:9E:68:35:CB:C6:49:58:1A:46:12:EA:45:D7:0B:5000
+export const BASE_URL = "https://broadcast-acdbentity-msgid-statement.trycloudflare.com ";
+//http://45:9C:2C:47:D0:EE:9E:68:35:CB:C6:49:58:1A:46:12:EA:45:D7:0B:5000   
