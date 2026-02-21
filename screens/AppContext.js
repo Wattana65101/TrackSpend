@@ -151,6 +151,31 @@ const themes = {
     chartIncome: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
     chartExpense: "#EF4444", 
   },
+  // ธีม: ชมพูตัดขาว (Pink & White)
+  pink: {
+    primary: "#DB2777", // pink-600 - ชมพูหลัก
+    primaryLight: "#EC4899", // pink-500 - ชมพูอ่อน
+    primaryDark: "#BE185D", // pink-700 - ชมพูเข้ม
+    background: "#FDF2F8", // pink-50 - พื้นหลังชมพูอ่อนมาก
+    backgroundLight: "#FCE7F3", // pink-100
+    card: "#FFFFFF",
+    cardLight: "#FDF2F8", // pink-50
+    text: "#831843", // pink-900 - ข้อความเข้ม
+    textMedium: "#9D174D", // pink-800 - ข้อความกลาง
+    subtext: "#6B7280", // gray-500
+    subtextLight: "#9CA3AF", // gray-400
+    income: "#10B981", // สีเขียวสำหรับรายรับ (คงที่ทุกธีม)
+    incomeLight: "#34D399",
+    incomeDark: "#059669",
+    expense: "#E11D48", // rose-600
+    expenseLight: "#F43F5E", // rose-500
+    expenseDark: "#BE123C", // rose-700
+    buttonIncome: "#10B981",
+    buttonExpense: "#E11D48",
+    budgetIcon: "#DB2777",
+    chartIncome: "#10B981",
+    chartExpense: "#E11D48",
+  },
   // ธีม: Dark Mode - ปรับความเข้มให้หลากหลาย
   dark: {
     primary: "#10B981", // emerald-500
