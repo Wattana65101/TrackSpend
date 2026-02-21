@@ -194,6 +194,7 @@ export default function SettingsScreen() {
             { id: "emerald", label: "Emerald", color: "#059669" },
             { id: "ocean", label: "Ocean", color: "#0EA5E9" },
             { id: "purple", label: "Purple", color: "#8B5CF6" },
+            { id: "pink", label: "ชมพูตัดขาว", color: "#DB2777" },
             { id: "sunset", label: "Sunset", color: "#F97316" },
             { id: "forest", label: "Forest", color: "#16A34A" },
             { id: "dark", label: "Dark", color: "#1F2937" },
