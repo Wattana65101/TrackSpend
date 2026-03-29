@@ -104,24 +104,34 @@ export default function AddTransactionScreen() {
   useEffect(() => {
     if (route.params?.type) {
       setType(route.params.type);
-      setSelectedCategory(null);
+      const budgetNames = (budgets || []).map((b) => b.category);
+      const defaultCat =
+        route.params.type === "expense" && budgetNames.includes("ค่าขยะ")
+          ? expenseCategories.find((c) => c.name === "ค่าขยะ")
+          : null;
+      setSelectedCategory(defaultCat);
       setAmount("");
       setNote("");
     }
-  }, [route.params?.type]);
+  }, [route.params?.type, budgets]);
 
-  // รีเซ็ตฟอร์มเมื่อเข้ามาหน้าเพิ่มรายการใหม่
+  // รีเซ็ตฟอร์มเมื่อเข้ามาหน้าเพิ่มรายการใหม่ - default ค่าขยะ เมื่อเป็นรายจ่ายและมีงบ
   useFocusEffect(
     React.useCallback(() => {
       const paramType = route.params?.type || "expense";
       setType(paramType);
-      setSelectedCategory(null);
+      const budgetNames = (budgets || []).map((b) => b.category);
+      const defaultCat =
+        paramType === "expense" && budgetNames.includes("ค่าขยะ")
+          ? expenseCategories.find((c) => c.name === "ค่าขยะ")
+          : null;
+      setSelectedCategory(defaultCat);
       setAmount("");
       setNote("");
       setIsRecurring(false);
-      previousCategoryRef.current = null;
+      previousCategoryRef.current = defaultCat?.name || null;
       return () => {};
-    }, [route.params?.type])
+    }, [route.params?.type, budgets])
   );
 
   // เคลียร์หมวดที่เลือกถ้าหมวดนั้นไม่มีในงบแล้ว (เฉพาะรายจ่าย)
